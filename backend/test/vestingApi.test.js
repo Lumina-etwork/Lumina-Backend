@@ -327,6 +327,68 @@ describe('Vesting API Routes', () => {
     });
   });
 
+  describe('GET /api/beneficiaries/:beneficiaryAddress/calendar.ics', () => {
+    const beneficiaryAddress = '0x2222222222222222222222222222222222222222';
+
+    beforeEach(async () => {
+      const vaultData = {
+        address: '0x1234567890123456789012345678901234567890',
+        name: 'Investor Seed Round',
+        token_address: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+        owner_address: '0x1111111111111111111111111111111111111111',
+        beneficiaries: [
+          {
+            address: beneficiaryAddress,
+            allocation: '250'
+          }
+        ]
+      };
+
+      const vaultResponse = await request(app)
+        .post('/api/vaults')
+        .send(vaultData)
+        .expect(201);
+
+      await request(app)
+        .post(`/api/vaults/${vaultResponse.body.data.address}/top-up`)
+        .send({
+          amount: '1000',
+          cliff_duration_seconds: 2592000,
+          vesting_duration_seconds: 10368000,
+          transaction_hash: '0xcalendarfeed1234567890',
+          block_number: 12345,
+          timestamp: '2024-01-01T00:00:00Z'
+        })
+        .expect(201);
+    });
+
+    test('should return an iCalendar feed for upcoming cliff ends and unlock milestones', async () => {
+      const response = await request(app)
+        .get(`/api/beneficiaries/${beneficiaryAddress}/calendar.ics`)
+        .query({ from: '2024-01-01T00:00:00Z' })
+        .expect(200);
+
+      expect(response).toSatisfyApiSpec();
+      expect(response.headers['content-type']).toContain('text/calendar');
+      expect(response.text).toContain('BEGIN:VCALENDAR');
+      expect(response.text).toContain('SUMMARY:Cliff ends for Investor Seed Round');
+      expect(response.text).toContain('SUMMARY:25% unlock milestone for Investor Seed Round');
+      expect(response.text).toContain('SUMMARY:100% unlock milestone for Investor Seed Round');
+      expect(response.text.match(/BEGIN:VEVENT/g) || []).toHaveLength(5);
+    });
+
+    test('should reject invalid calendar lower-bound dates', async () => {
+      const response = await request(app)
+        .get(`/api/beneficiaries/${beneficiaryAddress}/calendar.ics`)
+        .query({ from: 'not-a-real-date' })
+        .expect(400);
+
+      expect(response).toSatisfyApiSpec();
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Invalid from date');
+    });
+  });
+
   describe('GET /api/vaults/:vaultAddress/summary', () => {
     let vault;
 

@@ -1224,6 +1224,39 @@
  *           application/json:
  *             schema: { $ref: '#/components/schemas/SuccessResponse' }
  *
+ * /api/beneficiaries/{beneficiaryAddress}/calendar.ics:
+ *   get:
+ *     summary: Get beneficiary token unlock calendar feed
+ *     tags: [Vaults]
+ *     parameters:
+ *       - in: path
+ *         name: beneficiaryAddress
+ *         required: true
+ *         schema: { type: string }
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Optional ISO timestamp lower bound for upcoming events
+ *     responses:
+ *       200:
+ *         description: iCalendar feed retrieved
+ *         content:
+ *           text/calendar:
+ *             schema:
+ *               type: string
+ *       400:
+ *         description: Invalid request
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       500:
+ *         description: Error
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *
  * /api/delegate/set:
  *   post:
  *     summary: Set delegate

@@ -106,6 +106,7 @@ const vaultExportService = require('./services/vaultExportService');
 const authService = require('./services/authService');
 const notificationService = require('./services/notificationService');
 const pdfService = require('./services/pdfService');
+const calendarService = require('./services/calendarService');
 const VaultService = require('./services/vaultService');
 const monthlyReportJob = require('./jobs/monthlyReportJob');
 const { VaultReconciliationJob } = require('./jobs/vaultReconciliationJob');
@@ -349,6 +350,24 @@ app.get('/api/vaults/:vaultAddress/summary', async (req, res) => {
   } catch (error) {
     console.error('Error fetching vault summary:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/beneficiaries/:beneficiaryAddress/calendar.ics - Beneficiary unlock calendar export
+app.get('/api/beneficiaries/:beneficiaryAddress/calendar.ics', async (req, res) => {
+  try {
+    const { beneficiaryAddress } = req.params;
+    const { from } = req.query;
+    const feed = await calendarService.buildBeneficiaryCalendarFeed(beneficiaryAddress, { from });
+
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `inline; filename="${feed.fileName}"`);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.send(feed.ics);
+  } catch (error) {
+    console.error('Error generating beneficiary calendar feed:', error);
+    const statusCode = error.message === 'Invalid from date' ? 400 : 500;
+    res.status(statusCode).json({ success: false, error: error.message });
   }
 });
 
