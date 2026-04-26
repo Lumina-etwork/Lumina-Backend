@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: vesting_vault_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  pgbouncer:
+    image: edb/pgbouncer:latest
+    environment:
+      DATABASES_HOST: postgres
+      DATABASES_PORT: 5432
+      DATABASES_USER: postgres
+      DATABASES_PASSWORD: postgres
+      DATABASES_DBNAME: vesting_vault_test
+      PGBOUNCER_LISTEN_ADDR: 0.0.0.0
+      PGBOUNCER_LISTEN_PORT: 6432
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_MAX_CLIENT_CONN: 100
+      PGBOUNCER_DEFAULT_POOL_SIZE: 20
+      PGBOUNCER_MIN_POOL_SIZE: 5
+      PGBOUNCER_SERVER_RESET_QUERY: DISCARD ALL
+      PGBOUNCER_IGNORE_STARTUP_PARAMETERS: extra_float_digits
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 6432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "6432:6432"
+    volumes:
+      - ./pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini
+
+  app:
+    image: ghcr.io/akordavid373/backend:latest
+    environment:
+      NODE_ENV: test
+      PORT: 3000
+      DB_HOST: pgbouncer
+      DB_PORT: 6432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: vesting_vault_test
+      DB_SSL: false
+      DB_POOL_MAX: 20
+      DB_POOL_MIN: 5
+      DB_IDLE_TIMEOUT: 30000
+      DB_CONNECTION_TIMEOUT: 2000
+      STELLAR_HORIZON_PRIMARY: https://horizon-testnet.stellar.org
+      STELLAR_HORIZON_FALLBACK: https://horizon.stellar.org
+      STELLAR_SOROBAN_RPC: https://soroban-rpc.stellar.org
+      ADMIN_SIGNATURE_REQUIRED: true
+      ADMIN_PUBLIC_KEYS: "GD5QF6KBAURVUNZR2EVBJISWSEYGDGEEYVH2XYJJADKT7KFOXTTIXLHU"
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health/db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./tests:/app/tests
+
+  # Integration test runner
+  integration-tests:
+    image: node:18-alpine
+    environment:
+      NODE_ENV: test
+      DB_HOST: pgbouncer
+      DB_PORT: 6432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: vesting_vault_test
+      DB_SSL: false
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    working_dir: /app
+    command: >
+      sh -c "
+        npm ci &&
+        npm run test:integration
+      "
+
+volumes:
+  postgres_data:

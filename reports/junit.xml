@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="19" failures="0" errors="0" time="6.918">
+  <testsuite name="tests\app.test.js" errors="0" failures="0" skipped="0" timestamp="2026-04-26T06:50:55" time="3.874" tests="4">
+    <testcase classname="Vesting Vault API › GET /" name="should return application information" time="0.129">
+    </testcase>
+    <testcase classname="Vesting Vault API › GET /health/db" name="should return database health status" time="0.038">
+    </testcase>
+    <testcase classname="Admin Routes › GET /api/admin/status" name="should require authentication" time="0.008">
+    </testcase>
+    <testcase classname="Admin Routes › POST /api/admin/multisig/add-member" name="should require signature verification" time="0.03">
+    </testcase>
+  </testsuite>
+  <testsuite name="tests\integration\database.integration.test.js" errors="0" failures="0" skipped="0" timestamp="2026-04-26T06:50:55" time="4.45" tests="8">
+    <testcase classname="Database Integration Tests › PgBouncer Connection" name="should establish connection via PgBouncer" time="0.022">
+    </testcase>
+    <testcase classname="Database Integration Tests › PgBouncer Connection" name="should get connection metrics" time="0.003">
+    </testcase>
+    <testcase classname="Database Integration Tests › PgBouncer Connection" name="should handle database queries through connection pool" time="0.001">
+    </testcase>
+    <testcase classname="Database Integration Tests › API Database Endpoints" name="GET /health/db should return PgBouncer health status" time="0.054">
+    </testcase>
+    <testcase classname="Database Integration Tests › API Database Endpoints" name="GET /metrics/pgbouncer should return detailed metrics" time="0.009">
+    </testcase>
+    <testcase classname="Database Integration Tests › Connection Pooling" name="should handle multiple concurrent requests" time="0.059">
+    </testcase>
+    <testcase classname="Database Integration Tests › Connection Pooling" name="should maintain connection under load" time="0.202">
+    </testcase>
+    <testcase classname="Database Integration Tests › Error Handling" name="should handle database connection failures gracefully" time="0.006">
+    </testcase>
+  </testsuite>
+  <testsuite name="tests\integration\stellar.integration.test.js" errors="0" failures="0" skipped="0" timestamp="2026-04-26T06:50:55" time="6.293" tests="7">
+    <testcase classname="Stellar Service Integration Tests › Fallback Mechanism" name="should fallback to secondary endpoint on rate limit" time="1.461">
+    </testcase>
+    <testcase classname="Stellar Service Integration Tests › Fallback Mechanism" name="should handle circuit breaker pattern" time="0.001">
+    </testcase>
+    <testcase classname="Stellar Service Integration Tests › Fallback Mechanism" name="should track rate limits" time="0.001">
+    </testcase>
+    <testcase classname="Stellar Service Integration Tests › API Endpoints" name="GET /api/admin/status should return endpoint status" time="0.032">
+    </testcase>
+    <testcase classname="Stellar Service Integration Tests › API Endpoints" name="GET /health/db should return database health" time="0.015">
+    </testcase>
+    <testcase classname="Stellar Service Integration Tests › API Endpoints" name="GET /metrics/pgbouncer should return connection metrics" time="0.007">
+    </testcase>
+    <testcase classname="Stellar Service Integration Tests › Signature Verification" name="should reject requests without signature headers" time="0.026">
+    </testcase>
+  </testsuite>
+</testsuites>
