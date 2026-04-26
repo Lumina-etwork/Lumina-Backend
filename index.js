@@ -1,7 +1,7 @@
 require('reflect-metadata');
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+const { vaultManager } = require('./config/vault');
 
 const { databaseManager } = require('./config/database');
 const stellarService = require('./services/stellarService');
@@ -9,7 +9,7 @@ const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
 
 const app = express();
-const port = process.env.PORT || 3000;
+let port = 3000; // Default, will be updated from Vault
 
 // Middleware
 app.use(cors());
@@ -61,8 +61,16 @@ app.use('/api/admin', adminRoutes);
 // Initialize database connection
 async function initializeApp() {
   try {
+    // Initialize Vault and get configuration
+    await vaultManager.initialize();
+    const appConfig = vaultManager.getApplicationConfig();
+    port = appConfig.port;
+    
     await databaseManager.initialize();
     console.log('Database connection established with PgBouncer');
+    
+    // Initialize Stellar service with Vault secrets
+    await stellarService.initializeFromVault();
     
     // Test Stellar service fallback mechanism
     await stellarService.testFallback();
@@ -70,6 +78,7 @@ async function initializeApp() {
     app.listen(port, () => {
       console.log(`Vesting API running on port ${port}`);
       console.log('PgBouncer connection pooling active');
+      console.log('Vault secrets management enabled');
     });
   } catch (error) {
     console.error('Failed to initialize application:', error);

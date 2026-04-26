@@ -1,11 +1,13 @@
 const { Horizon, SorobanRpc } = require('stellar-sdk');
+const { vaultManager } = require('../config/vault');
 
 class StellarService {
   constructor() {
+    // Initialize with default values, will be updated from Vault
     this.endpoints = {
-      primary: process.env.STELLAR_HORIZON_PRIMARY || 'https://horizon.stellar.org',
-      fallback: process.env.STELLAR_HORIZON_FALLBACK || 'https://horizon-testnet.stellar.org',
-      soroban: process.env.STELLAR_SOROBAN_RPC || 'https://soroban-rpc.stellar.org'
+      primary: 'https://horizon.stellar.org',
+      fallback: 'https://horizon-testnet.stellar.org',
+      soroban: 'https://soroban-rpc.stellar.org'
     };
     
     this.currentEndpoint = this.endpoints.primary;
@@ -53,6 +55,30 @@ class StellarService {
       fallback: new Horizon.Server(this.endpoints.fallback),
       soroban: new SorobanRpc.Server(this.endpoints.soroban)
     };
+  }
+  
+  async initializeFromVault() {
+    try {
+      await vaultManager.initialize();
+      const stellarConfig = vaultManager.getStellarConfig();
+      
+      this.endpoints = {
+        primary: stellarConfig.horizon_primary,
+        fallback: stellarConfig.horizon_fallback,
+        soroban: stellarConfig.soroban_rpc
+      };
+      
+      // Reinitialize servers with new endpoints
+      this.servers = {
+        primary: new Horizon.Server(this.endpoints.primary),
+        fallback: new Horizon.Server(this.endpoints.fallback),
+        soroban: new SorobanRpc.Server(this.endpoints.soroban)
+      };
+      
+      console.log('Stellar service initialized with Vault secrets');
+    } catch (error) {
+      console.warn('Failed to initialize Stellar service from Vault, using defaults:', error.message);
+    }
   }
 
   async makeRequest(requestFn, endpoint = 'primary') {

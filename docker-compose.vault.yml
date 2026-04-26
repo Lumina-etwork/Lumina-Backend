@@ -1,0 +1,136 @@
+version: '3.8'
+
+services:
+  # HashiCorp Vault
+  vault:
+    image: vault:1.15.0
+    container_name: vesting-vault-vault
+    restart: unless-stopped
+    environment:
+      VAULT_ADDR: http://0.0.0.0:8200
+      VAULT_API_ADDR: http://localhost:8200
+    ports:
+      - "8200:8200"
+    volumes:
+      - ./config/vault-config.hcl:/vault/config/vault-config.hcl
+      - vault_data:/vault/data
+      - ./scripts/setup-vault.sh:/scripts/setup-vault.sh
+    networks:
+      - vesting-network
+    command: vault server -config=/vault/config/vault-config.hcl
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: vesting-vault-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vesting_vault
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - vesting-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d vesting_vault"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PgBouncer for connection pooling
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: vesting-vault-pgbouncer
+    restart: unless-stopped
+    environment:
+      DATABASES_HOST: db
+      DATABASES_PORT: 5432
+      DATABASES_USER: postgres
+      DATABASES_PASSWORD: password
+      DATABASES_NAME: vesting_vault
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 100
+      DEFAULT_POOL_SIZE: 20
+      MIN_POOL_SIZE: 5
+      SERVER_RESET_QUERY: DISCARD ALL
+    ports:
+      - "6432:5432"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - vesting-network
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "localhost", "-p", "5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API with Vault integration
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vesting-vault-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_TOKEN}
+    ports:
+      - "3000:3000"
+    depends_on:
+      vault:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+    networks:
+      - vesting-network
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis (optional, for caching/sessions)
+  redis:
+    image: redis:7-alpine
+    container_name: vesting-vault-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - vesting-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  vault_data:
+    driver: local
+
+networks:
+  vesting-network:
+    driver: bridge

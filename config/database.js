@@ -1,4 +1,5 @@
 const { DataSource } = require('typeorm');
+const { vaultManager } = require('./vault');
 
 class DatabaseManager {
   constructor() {
@@ -13,32 +14,37 @@ class DatabaseManager {
     };
   }
 
-  createConnection() {
+  async createConnection() {
+    // Ensure Vault is initialized before creating connection
+    await vaultManager.initialize();
+    const dbConfig = vaultManager.getDatabaseConfig();
+    const appConfig = vaultManager.getApplicationConfig();
+
     this.dataSource = new DataSource({
       type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT) || 6432, // Default PgBouncer port
-      username: process.env.DB_USERNAME || 'postgres',
-      password: process.env.DB_PASSWORD || 'password',
-      database: process.env.DB_NAME || 'vesting_vault',
-      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      host: dbConfig.host,
+      port: dbConfig.port,
+      username: dbConfig.username,
+      password: dbConfig.password,
+      database: dbConfig.database,
+      ssl: dbConfig.ssl ? { rejectUnauthorized: false } : false,
       
       // PgBouncer specific configuration
       extra: {
-        max: parseInt(process.env.DB_POOL_MAX) || 20,
-        min: parseInt(process.env.DB_POOL_MIN) || 5,
-        idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || 30000,
-        connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 2000,
+        max: dbConfig.pool_max,
+        min: dbConfig.pool_min,
+        idleTimeoutMillis: dbConfig.idle_timeout,
+        connectionTimeoutMillis: dbConfig.connection_timeout,
         // PgBouncer specific settings
         application_name: 'vesting_vault_backend',
-        connect_timeout_ms: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 2000,
+        connect_timeout_ms: dbConfig.connection_timeout,
         // Transaction pooling mode for PgBouncer
         pgbouncer: true
       },
       
       // TypeORM specific settings for connection pooling
-      synchronize: process.env.NODE_ENV !== 'production',
-      logging: process.env.NODE_ENV === 'development',
+      synchronize: appConfig.node_env !== 'production',
+      logging: appConfig.node_env === 'development',
       entities: ['src/entities/**/*.js'],
       migrations: ['src/migrations/**/*.js'],
       subscribers: ['src/subscribers/**/*.js'],
