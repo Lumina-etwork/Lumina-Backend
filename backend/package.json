@@ -70,7 +70,7 @@
     "sequelize": "^6.37.8",
     "socket.io": "^4.8.3",
     "stellar-sdk": "^11.3.0",
-    "swagger-jsdoc": "^6.2.8",
+    "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3",
