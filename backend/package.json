@@ -21,7 +21,7 @@
     "@graphql-tools/schema": "^10.0.33",
     "@nestjs-redis/throttler-storage": "^1.2.0",
     "@nestjs/bullmq": "^11.0.4",
-    "@nestjs/common": "^11.1.19",
+    "@nestjs/common": "^11.1.24",
     "@nestjs/core": "^11.1.19",
     "@nestjs/platform-express": "^11.1.19",
     "@nestjs/throttler": "^6.5.0",
