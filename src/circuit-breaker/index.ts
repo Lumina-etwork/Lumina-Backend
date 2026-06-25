@@ -1,0 +1,8 @@
+export { BackoffCalculator } from "./backoff-calculator"
+export { FailureSlidingWindow } from "./failure-sliding-window"
+export { ProbeExecutor } from "./probe-executor"
+export type { ProbeResult } from "./probe-executor"
+export { UpstreamHealthCache } from "./upstream-health-cache"
+export type { HealthRecord } from "./upstream-health-cache"
+export { CircuitBreakerStateMachine } from "./state-machine"
+export type { CircuitState, CircuitBreakerOptions } from "./state-machine"
