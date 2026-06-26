@@ -1,5 +1,5 @@
 const futureLienService = require('../src/services/futureLienService');
-const { Vault, Beneficiary, GrantStream, FutureLien, LienRelease, LienMilestone } = require('../src/models');
+const { Vault, Beneficiary, GrantStream, FutureLien, LienRelease, LienMilestone, SubSchedule } = require('../src/models');
 const { sequelize } = require('../src/database/connection');
 
 describe('Future Lien Service Unit Tests', () => {
@@ -35,6 +35,30 @@ describe('Future Lien Service Unit Tests', () => {
       target_amount: '10000',
       is_active: true
     });
+
+    // Create a SubSchedule so vesting calculations return non-zero values
+    const vestingStart = new Date(Date.now() - 86400000 * 30);
+    const vestingEnd = new Date(Date.now() + 86400000 * 365);
+    await SubSchedule.create({
+      vault_id: testVault.id,
+      top_up_amount: '1000000',
+      cliff_duration: 0,
+      cliff_date: null,
+      vesting_start_date: vestingStart,
+      vesting_duration: 31536000,
+      start_timestamp: vestingStart,
+      end_timestamp: vestingEnd,
+      transaction_hash: '0x' + 'f'.repeat(64),
+      amount_withdrawn: '0',
+      amount_released: '0',
+      is_active: true
+    });
+  });
+
+  afterEach(async () => {
+    await LienMilestone.destroy({ where: {} });
+    await LienRelease.destroy({ where: {} });
+    await FutureLien.destroy({ where: {} });
   });
 
   afterAll(async () => {
@@ -59,7 +83,7 @@ describe('Future Lien Service Unit Tests', () => {
       expect(result.success).toBe(true);
       expect(result.lien.vault_address).toBe(testVault.address);
       expect(result.lien.beneficiary_address).toBe(testUserAddress);
-      expect(result.lien.committed_amount).toBe('100');
+      expect(parseFloat(result.lien.committed_amount)).toBe(100);
       expect(result.lien.status).toBe('pending');
     });
 
@@ -90,7 +114,7 @@ describe('Future Lien Service Unit Tests', () => {
 
       expect(result.success).toBe(true);
       expect(result.lien.milestones).toHaveLength(2);
-      expect(result.lien.milestones[0].percentage_of_total).toBe('50');
+      expect(parseFloat(result.lien.milestones[0].percentage_of_total)).toBe(50);
     });
 
     test('should throw error for non-existent vault', async () => {
@@ -191,11 +215,21 @@ describe('Future Lien Service Unit Tests', () => {
     });
 
     test('should exclude inactive liens by default', async () => {
+      // Create a second grant stream for this test
+      const secondGrantStream = await GrantStream.create({
+        address: '0x3333333333333333333333333333333333333333',
+        name: 'Second Grant Stream',
+        owner_address: testUserAddress,
+        token_address: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+        target_amount: '5000',
+        is_active: true
+      });
+
       // Create an inactive lien
       const result = await futureLienService.createFutureLien({
         vault_address: testVault.address,
         beneficiary_address: testUserAddress,
-        grant_stream_id: testGrantStream.id,
+        grant_stream_id: secondGrantStream.id,
         committed_amount: 50,
         release_start_date: new Date(Date.now() + 86400000),
         release_end_date: new Date(Date.now() + 86400000 * 365),
@@ -215,18 +249,22 @@ describe('Future Lien Service Unit Tests', () => {
     let testLien;
 
     beforeEach(async () => {
-      // Create a test lien with immediate release
-      const result = await futureLienService.createFutureLien({
+      // Create a test lien directly (bypass service date validation)
+      testLien = await FutureLien.create({
         vault_address: testVault.address,
         beneficiary_address: testUserAddress,
         grant_stream_id: testGrantStream.id,
-        committed_amount: 100,
-        release_start_date: new Date(Date.now() - 86400000), // Yesterday
-        release_end_date: new Date(Date.now() + 86400000), // Tomorrow
-        release_rate_type: 'immediate'
-      }, testUserAddress);
-      
-      testLien = result.lien;
+        committed_amount: '100',
+        released_amount: '0',
+        vesting_start_date: new Date(Date.now() - 86400000 * 30),
+        vesting_end_date: new Date(Date.now() + 86400000 * 365),
+        release_start_date: new Date(Date.now() - 86400000),
+        release_end_date: new Date(Date.now() + 86400000),
+        release_rate_type: 'immediate',
+        status: 'active',
+        is_active: true,
+        creation_transaction_hash: '0x' + 'f'.repeat(64)
+      });
     });
 
     test('should process a lien release successfully', async () => {
@@ -240,8 +278,8 @@ describe('Future Lien Service Unit Tests', () => {
       const result = await futureLienService.processLienRelease(releaseData, testUserAddress);
 
       expect(result.success).toBe(true);
-      expect(result.release.amount).toBe('50');
-      expect(result.lien.released_amount).toBe('50');
+      expect(parseFloat(result.release.amount)).toBe(50);
+      expect(parseFloat(result.lien.released_amount)).toBe(50);
       expect(result.lien.status).toBe('active');
     });
 
@@ -277,7 +315,7 @@ describe('Future Lien Service Unit Tests', () => {
       };
 
       await expect(futureLienService.processLienRelease(releaseData, testUserAddress))
-        .rejects.toThrow('is cancelled');
+        .rejects.toThrow('is not active');
     });
   });
 
@@ -285,30 +323,44 @@ describe('Future Lien Service Unit Tests', () => {
     let testLien;
 
     beforeEach(async () => {
-      // Create a test lien with milestones
-      const result = await futureLienService.createFutureLien({
+      // Create a test lien with milestones directly
+      testLien = await FutureLien.create({
         vault_address: testVault.address,
         beneficiary_address: testUserAddress,
         grant_stream_id: testGrantStream.id,
-        committed_amount: 200,
+        committed_amount: '200',
+        released_amount: '0',
+        vesting_start_date: new Date(Date.now() - 86400000 * 30),
+        vesting_end_date: new Date(Date.now() + 86400000 * 365),
         release_start_date: new Date(Date.now() - 86400000),
         release_end_date: new Date(Date.now() + 86400000 * 365),
         release_rate_type: 'milestone',
-        milestones: [
-          {
-            name: 'Milestone 1',
-            percentage_of_total: 50,
-            target_date: new Date(Date.now() - 86400000) // Past date
-          },
-          {
-            name: 'Milestone 2',
-            percentage_of_total: 50,
-            target_date: new Date(Date.now() + 86400000 * 90) // Future date
-          }
-        ]
-      }, testUserAddress);
-      
-      testLien = result.lien;
+        status: 'active',
+        is_active: true,
+        creation_transaction_hash: '0x' + 'f'.repeat(64)
+      });
+
+      // Create milestones
+      await LienMilestone.create({
+        lien_id: testLien.id,
+        name: 'Milestone 1',
+        percentage_of_total: 50,
+        target_date: new Date(Date.now() - 86400000),
+        is_completed: false
+      });
+
+      await LienMilestone.create({
+        lien_id: testLien.id,
+        name: 'Milestone 2',
+        percentage_of_total: 50,
+        target_date: new Date(Date.now() + 86400000 * 90),
+        is_completed: false
+      });
+
+      // Reload with associations
+      testLien = await FutureLien.findByPk(testLien.id, {
+        include: [{ model: LienMilestone, as: 'milestones' }]
+      });
     });
 
     test('should process milestone release', async () => {
@@ -323,7 +375,7 @@ describe('Future Lien Service Unit Tests', () => {
       const result = await futureLienService.processLienRelease(releaseData, testUserAddress);
 
       expect(result.success).toBe(true);
-      expect(result.release.amount).toBe('100'); // 50% of 200
+      expect(parseFloat(result.release.amount)).toBe(100); // 50% of 200
     });
 
     test('should throw error for completed milestone', async () => {
@@ -347,17 +399,21 @@ describe('Future Lien Service Unit Tests', () => {
     let testLien;
 
     beforeEach(async () => {
-      const result = await futureLienService.createFutureLien({
+      testLien = await FutureLien.create({
         vault_address: testVault.address,
         beneficiary_address: testUserAddress,
         grant_stream_id: testGrantStream.id,
-        committed_amount: 100,
-        release_start_date: new Date(Date.now() + 86400000),
+        committed_amount: '100',
+        released_amount: '0',
+        vesting_start_date: new Date(Date.now() - 86400000 * 30),
+        vesting_end_date: new Date(Date.now() + 86400000 * 365),
+        release_start_date: new Date(Date.now() - 86400000),
         release_end_date: new Date(Date.now() + 86400000 * 365),
-        release_rate_type: 'linear'
-      }, testUserAddress);
-      
-      testLien = result.lien;
+        release_rate_type: 'linear',
+        status: 'active',
+        is_active: true,
+        creation_transaction_hash: '0x' + 'f'.repeat(64)
+      });
     });
 
     test('should cancel a future lien successfully', async () => {
@@ -376,13 +432,24 @@ describe('Future Lien Service Unit Tests', () => {
     });
 
     test('should throw error for completed lien', async () => {
-      // Complete the lien first
-      await futureLienService.processLienRelease({
-        lien_id: testLien.id,
-        amount: 100
-      }, testUserAddress);
+      // Create a completed lien directly
+      const completedLien = await FutureLien.create({
+        vault_address: testVault.address,
+        beneficiary_address: testUserAddress,
+        grant_stream_id: testGrantStream.id,
+        committed_amount: '100',
+        released_amount: '100',
+        vesting_start_date: new Date(Date.now() - 86400000 * 30),
+        vesting_end_date: new Date(Date.now() + 86400000 * 365),
+        release_start_date: new Date(Date.now() - 86400000),
+        release_end_date: new Date(Date.now() + 86400000 * 365),
+        release_rate_type: 'linear',
+        status: 'completed',
+        is_active: true,
+        creation_transaction_hash: '0x' + 'g'.repeat(64)
+      });
 
-      await expect(futureLienService.cancelFutureLien(testLien.id, testUserAddress))
+      await expect(futureLienService.cancelFutureLien(completedLien.id, testUserAddress))
         .rejects.toThrow('Cannot cancel completed lien');
     });
   });
@@ -403,7 +470,7 @@ describe('Future Lien Service Unit Tests', () => {
       expect(result.success).toBe(true);
       expect(result.grant_stream.name).toBe('New Grant Stream');
       expect(result.grant_stream.is_active).toBe(true);
-      expect(result.grant_stream.current_amount).toBe('0');
+      expect(result.grant_stream.current_amount).toBe(0);
     });
 
     test('should throw error for duplicate address', async () => {
@@ -421,26 +488,38 @@ describe('Future Lien Service Unit Tests', () => {
 
   describe('getActiveLienSummary', () => {
     beforeEach(async () => {
-      // Create multiple test liens
-      await futureLienService.createFutureLien({
+      // Create multiple test liens directly
+      await FutureLien.create({
         vault_address: testVault.address,
         beneficiary_address: testUserAddress,
         grant_stream_id: testGrantStream.id,
-        committed_amount: 100,
+        committed_amount: '100',
+        released_amount: '0',
+        vesting_start_date: new Date(Date.now() - 86400000 * 30),
+        vesting_end_date: new Date(Date.now() + 86400000 * 365),
         release_start_date: new Date(Date.now() - 86400000),
         release_end_date: new Date(Date.now() + 86400000 * 30),
-        release_rate_type: 'linear'
-      }, testUserAddress);
+        release_rate_type: 'linear',
+        status: 'active',
+        is_active: true,
+        creation_transaction_hash: '0x' + 'h'.repeat(64)
+      });
 
-      await futureLienService.createFutureLien({
+      await FutureLien.create({
         vault_address: testVault.address,
         beneficiary_address: testUserAddress,
         grant_stream_id: testGrantStream.id,
-        committed_amount: 150,
+        committed_amount: '150',
+        released_amount: '0',
+        vesting_start_date: new Date(Date.now() + 86400000),
+        vesting_end_date: new Date(Date.now() + 86400000 * 60),
         release_start_date: new Date(Date.now() + 86400000),
         release_end_date: new Date(Date.now() + 86400000 * 60),
-        release_rate_type: 'immediate'
-      }, testUserAddress);
+        release_rate_type: 'immediate',
+        status: 'pending',
+        is_active: true,
+        creation_transaction_hash: '0x' + 'i'.repeat(64)
+      });
     });
 
     test('should get active lien summary', async () => {

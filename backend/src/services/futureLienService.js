@@ -179,6 +179,30 @@ class FutureLienService {
   }
 
   /**
+   * Get a single lien by ID
+   * 
+   * @param {number} id - Lien ID
+   * @returns {Promise<Object|null>} Lien object with computed fields or null
+   */
+  async getLienById(id) {
+    const lien = await FutureLien.findByPk(id, {
+      include: [
+        { model: GrantStream, as: 'grantStream' },
+        { model: LienRelease, as: 'releases' },
+        { model: LienMilestone, as: 'milestones' }
+      ]
+    });
+
+    if (!lien) return null;
+
+    return {
+      ...lien.toJSON(),
+      available_for_release: lien.calculateAvailableForRelease(),
+      remaining_amount: lien.getRemainingAmount()
+    };
+  }
+
+  /**
    * Get all liens for a specific beneficiary
    * 
    * @param {string} beneficiaryAddress - Beneficiary address
@@ -401,7 +425,7 @@ class FutureLienService {
         transaction_hash,
         block_number,
         metadata: {
-          processor_address,
+          processor_address: processorAddress,
           release_type: lien.release_rate_type,
           milestone_id
         }

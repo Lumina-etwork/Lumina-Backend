@@ -23,8 +23,10 @@ describe('Vesting Service - Top-up with Cliff Functionality', () => {
 
 
   beforeEach(async () => {
-    // Truncate tables instead of force sync to handle foreign key constraints better in SQLite
-    await sequelize.truncate({ cascade: true, restartIdentity: true });
+    // Clean up tables instead of truncate (SQLite compatibility)
+    await models.SubSchedule.destroy({ where: {} });
+    await models.Beneficiary.destroy({ where: {} });
+    await models.Vault.destroy({ where: {} });
     // Setup test vault
     const startDate = new Date('2024-01-01');
     const endDate = new Date('2025-01-01');
@@ -98,8 +100,8 @@ describe('Vesting Service - Top-up with Cliff Functionality', () => {
       });
 
       // Test during cliff period (should be 0)
-      const ownerBeneficiary = testVault?.beneficiaries?.[0]?.address || ownerAddress;
-      // Make sure beneficiary exists first before calculating withdrawable amount
+      const ownerBeneficiary = ownerAddress;
+      // Make sure beneficiary exists first with a proper allocation
       try { 
         const beneficiaryModel = require('../src/models/beneficiary');
         const vaultModel = require('../src/models/vault');
@@ -107,7 +109,7 @@ describe('Vesting Service - Top-up with Cliff Functionality', () => {
         await beneficiaryModel.create({ 
           vault_id: existingVault.id, 
           address: ownerBeneficiary, 
-          total_allocated: '0' 
+          total_allocated: '500' 
         });
       } catch (e) {
         // Beneficiary may already exist
@@ -260,7 +262,7 @@ describe('Full Flow Integration Test', () => {
     expect(vaultDetails.sub_schedules).toHaveLength(1);
 
     // 4. Calculate releasable (should be 0 during cliff)
-    const ownerBeneficiary = vault?.beneficiaries?.[0]?.address || ownerAddress;
+    const ownerBeneficiary = ownerAddress;
     try { 
       const beneficiaryModel = require('../src/models/beneficiary');
       const vaultModel = require('../src/models/vault');
@@ -268,7 +270,7 @@ describe('Full Flow Integration Test', () => {
       await beneficiaryModel.create({ 
         vault_id: existingVault.id, 
         address: ownerBeneficiary, 
-        total_allocated: '0' 
+        total_allocated: '500' 
       });
     } catch (e) {
       // Beneficiary may already exist

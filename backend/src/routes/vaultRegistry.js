@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { Op } = require('sequelize');
 const vaultRegistryService = require('../services/vaultRegistryService');
 const Sentry = require('@sentry/node');
 const { applyPrivacyMasking } = require('../utils/privacyMasking');
@@ -441,7 +442,7 @@ router.get('/stats', async (req, res) => {
       VaultRegistry.count({
         where: {
           discovered_at: {
-            [sequelize.Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
+            [Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
           }
         }
       })

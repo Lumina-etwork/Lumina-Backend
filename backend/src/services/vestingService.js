@@ -115,12 +115,8 @@ class VestingService {
         });
 
         // Immutable Audit Log
-        await AuditService.logAction({
-          adminPubkey: adminAddress,
-          action: AuditService.ACTIONS.CREATE_VESTING_SCHEDULE,
-          ipAddress: 'unknown',
-          payload: { vaultAddress, ownerAddress, tokenAddress, totalAmount, startDate, endDate, cliffDate },
-          resourceId: vaultAddress
+        await auditLogger.logAction(adminAddress, 'CREATE_VESTING_SCHEDULE', vaultAddress, {
+          vaultAddress, ownerAddress, tokenAddress, totalAmount, startDate, endDate, cliffDate
         });
 
         return {

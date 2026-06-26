@@ -116,7 +116,7 @@ class VaultRegistryService {
         sortOrder = 'DESC'
       } = options;
 
-      const whereClause = { creator_address };
+      const whereClause = { creator_address: creatorAddress };
       if (!includeInactive) {
         whereClause.is_active = true;
       }
@@ -177,7 +177,7 @@ class VaultRegistryService {
 
       const whereClause = {
         project_name: {
-          [Op.iLike]: `%${projectName}%`
+          [Op.like]: `%${projectName}%`
         }
       };
       

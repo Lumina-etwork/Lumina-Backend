@@ -50,6 +50,7 @@ router.post('/generate-milestones', async (req, res) => {
   } catch (error) {
     console.error('Error generating milestones:', error);
     res.status(500).json({ 
+      success: false,
       error: 'Failed to generate vesting milestones',
       details: error.message 
     });

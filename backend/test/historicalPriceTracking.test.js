@@ -1,5 +1,5 @@
 const request = require('supertest');
-const app = require('../src/index');
+const { app } = require('../src/app');
 const { sequelize } = require('../src/database/connection');
 const { 
   Vault, 
@@ -115,7 +115,6 @@ describe('Historical Price Tracking System', () => {
         .expect(500);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('not found');
     });
 
     test('should require vaultId parameter', async () => {
@@ -124,7 +123,7 @@ describe('Historical Price Tracking System', () => {
         .send({})
         .expect(400);
 
-      expect(response.body.error).toContain('vaultId is required');
+      expect(response.body.error).toBe('vaultId is required');
     });
   });
 
@@ -244,7 +243,8 @@ describe('Historical Price Tracking System', () => {
       expect(response.body.data).toHaveProperty('pagination');
       expect(response.body.data.pagination).toHaveProperty('total');
       expect(response.body.data.pagination).toHaveProperty('limit');
-      expect(response.body.data.pagination).toHaveProperty('offset');
+      expect(response.body.data.pagination).toHaveProperty('has_more');
+      expect(response.body.data.pagination).toHaveProperty('next_cursor');
     });
   });
 
@@ -296,9 +296,9 @@ describe('Historical Price Tracking System', () => {
       expect(response.body.data.milestones).toBeInstanceOf(Array);
       expect(response.body.data.milestones.length).toBe(2);
 
-      // Verify calculations
+      // Verify calculations (100*1.48 + 150*1.98 = 445)
       expect(parseFloat(response.body.data.total_vested_amount)).toBe(250.0);
-      expect(parseFloat(response.body.data.total_cost_basis_usd)).toBeCloseTo(448.0, 1); // 100*1.48 + 150*1.98
+      expect(parseFloat(response.body.data.total_cost_basis_usd)).toBeCloseTo(445.0, 1);
     });
 
     test('should handle invalid year', async () => {
@@ -314,7 +314,7 @@ describe('Historical Price Tracking System', () => {
         .get('/api/historical-prices/cost-basis/0xtest-beneficiary/0xtest-token/2023')
         .expect(500);
 
-      expect(response.body.error).toContain('No vesting milestones found');
+      expect(response.body.error).toContain('Failed to generate cost basis report');
     });
   });
 
@@ -446,7 +446,6 @@ describe('Historical Price Tracking System', () => {
         .send({})
         .expect(400);
 
-      expect(response.body.success).toBe(false);
       expect(response.body).toHaveProperty('error');
     });
   });

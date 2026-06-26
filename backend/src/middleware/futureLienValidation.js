@@ -24,9 +24,13 @@ const validateVault = async (vaultAddress) => {
 
 // Validate that a beneficiary exists in a vault
 const validateBeneficiaryInVault = async (vaultAddress, beneficiaryAddress) => {
+  const vault = await Vault.findOne({ where: { address: vaultAddress } });
+  if (!vault) {
+    throw new Error(`Vault not found: ${vaultAddress}`);
+  }
   const beneficiary = await Beneficiary.findOne({
     where: { 
-      vault_address: vaultAddress, 
+      vault_id: vault.id, 
       address: beneficiaryAddress 
     }
   });

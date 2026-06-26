@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const futureLienService = require('../services/futureLienService');
-const { authenticateToken } = require('../middleware/authMiddleware');
+const { authenticateToken } = require('../middleware/auth.middleware');
 const {
   createFutureLienValidation,
   processLienReleaseValidation,
@@ -11,6 +11,7 @@ const {
   calculatorValidation,
   handleValidationErrors
 } = require('../middleware/futureLienValidation');
+const { param, query } = require('express-validator');
 
 // POST /api/future-liens - Create a new future lien
 router.post('/future-liens', authenticateToken, createFutureLienValidation, handleValidationErrors, async (req, res) => {
@@ -210,9 +211,7 @@ router.get('/future-liens/:id', authenticateToken, getLienValidation, handleVali
   try {
     const { id } = req.params;
 
-    // Use the beneficiary liens endpoint with specific ID filter
-    const liens = await futureLienService.getBeneficiaryLiens('', { includeInactive: true });
-    const lien = liens.find(l => l.id === parseInt(id));
+    const lien = await futureLienService.getLienById(parseInt(id));
 
     if (!lien) {
       return res.status(404).json({

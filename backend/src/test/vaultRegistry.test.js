@@ -1,27 +1,28 @@
 const request = require('supertest');
-const { app } = require('../index');
+const jwt = require('jsonwebtoken');
+const { app } = require('../app');
 const { sequelize } = require('../database/connection');
-const { VaultRegistry, IndexerState } = require('../models');
+const { VaultRegistry } = require('../models');
 
 describe('Vault Registry API', () => {
-  let server;
+  let authToken;
 
   beforeAll(async () => {
-    // Start the server for testing
-    server = app.listen(0); // Use random port
+    await sequelize.sync();
+    authToken = jwt.sign(
+      { address: '0x1234567890123456789012345678901234567890', role: 'admin', type: 'access' },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m', issuer: 'vesting-vault', audience: 'vesting-vault-api' }
+    );
   });
 
   afterAll(async () => {
-    if (server) {
-      await server.close();
-    }
-    await sequelize.close();
+    // Don't close sequelize - let the process handle it
   });
 
   beforeEach(async () => {
     // Clean up database before each test
     await VaultRegistry.destroy({ where: {} });
-    await IndexerState.destroy({ where: {} });
   });
 
   describe('GET /api/registry/vaults/by-creator/:creatorAddress', () => {
@@ -192,6 +193,7 @@ describe('Vault Registry API', () => {
 
       const response = await request(app)
         .get(`/api/registry/vaults/${vault.contract_id}`)
+        .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -202,6 +204,7 @@ describe('Vault Registry API', () => {
     it('should return 404 for non-existent vault', async () => {
       const response = await request(app)
         .get('/api/registry/vaults/CA000000000000000')
+        .set('Authorization', `Bearer ${authToken}`)
         .expect(404);
 
       expect(response.body.success).toBe(false);

@@ -61,6 +61,10 @@ initOrganizationWebhookModel(sequelize);
 
 // Initialize TicketType model (it seems to be a function in this codebase)
 const TicketTypeModel = typeof TicketType === 'function' ? TicketType(sequelize) : TicketType;
+// Initialize factory function models (they export (sequelize) => model)
+const FutureLienModel = typeof FutureLien === 'function' ? FutureLien(sequelize) : FutureLien;
+const LienReleaseModel = typeof LienRelease === 'function' ? LienRelease(sequelize) : LienRelease;
+const LienMilestoneModel = typeof LienMilestone === 'function' ? LienMilestone(sequelize) : LienMilestone;
 
 const models = {
   ClaimsHistory,
@@ -103,12 +107,12 @@ const models = {
   ConversionEvent,
   MilestoneCelebrationWebhook,
   GrantStream,
-  FutureLien,
-  LienRelease,
-  LienMilestone,
   DAOProposal,
   DAOVote,
   TicketType: TicketTypeModel,
+  FutureLien: FutureLienModel,
+  LienRelease: LienReleaseModel,
+  LienMilestone: LienMilestoneModel,
   SorobanEvent,
   AdminAuditLog,
   GrantPriceSnapshot,
@@ -118,6 +122,7 @@ const models = {
 };
 
 // Setup associations
+require("./associations")(models);
 Object.keys(models).forEach((modelName) => {
   if (models[modelName] && models[modelName].associate) {
     models[modelName].associate(models);
