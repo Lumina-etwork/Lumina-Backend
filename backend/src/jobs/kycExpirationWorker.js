@@ -1,6 +1,6 @@
 'use strict';
 
-const { KycStatus } = require('../models/KycStatus');
+const { KycStatus } = require('../models/kycStatus');
 const { sequelize } = require('../database/connection');
 const { Op } = require('sequelize');
 const emailService = require('../services/emailService');

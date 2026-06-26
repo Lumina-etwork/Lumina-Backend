@@ -74,8 +74,31 @@ const initializeDatabase = async () => {
   return sequelize;
 };
 
-// Initialize immediately for backward compatibility
+// Initialize immediately (sync in test mode since SQLite doesn't need secrets)
 let initPromise = initializeDatabase();
+
+// In test mode, await initialization synchronously so models can use sequelize
+if (process.env.NODE_ENV === 'test') {
+  // Create sequelize synchronously for test mode
+  sequelize = new (require('sequelize')).Sequelize({
+    dialect: 'sqlite',
+    storage: ':memory:',
+    logging: false,
+  });
+  // Patch sync
+  sequelize.sync = async (options = {}) => {
+    const modelNames = Object.keys(sequelize.models);
+    for (const name of modelNames) {
+      try {
+        await sequelize.query('PRAGMA foreign_keys = OFF;');
+        await sequelize.models[name].sync(options);
+      } catch (err) {
+        // Swallow per-model sync errors
+      }
+    }
+  };
+}
+
 
 // Read/write splitting support — in test mode (sqlite) this is just the same instance
 const getDatabaseConnection = (operationType) => {

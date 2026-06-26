@@ -273,8 +273,13 @@ const validateHSMOperation = (operationType) => {
   };
 };
 
+const authenticateToken = authenticateAdmin;
+const authMiddleware = authenticateAdmin;
+
 module.exports = {
   authenticateAdmin,
+  authenticateToken,
+  authMiddleware,
   hsmSecurityMiddleware,
   validateHSMOperation,
   verifyAdminStatus

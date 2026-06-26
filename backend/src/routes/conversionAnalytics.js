@@ -3,7 +3,7 @@ const router = express.Router();
 const pathPaymentAnalyticsService = require('../services/pathPaymentAnalyticsService');
 const stellarPathPaymentListener = require('../services/stellarPathPaymentListener');
 const { authMiddleware } = require('../middleware/auth.middleware');
-const { body, query, validationResult } = require('express-validator');
+const { body, query, param, validationResult } = require('express-validator');
 
 /**
  * @route GET /api/conversions/user/:userAddress

@@ -13,7 +13,7 @@ process.env.NODE_ENV = 'test';
 
 const request = require('supertest');
 const { sequelize } = require('../src/database/connection');
-const app = require('../src/index');
+const { app } = require('../src/app');
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 

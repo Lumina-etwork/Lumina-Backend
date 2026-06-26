@@ -17,7 +17,7 @@ jest.mock('../src/services/indexingService', () => ({
   listenToEvents: jest.fn(),
 }));
 
-const app = require('../src/index');
+const { app } = require('../src/app');
 const { sequelize } = require('../src/database/connection');
 const { Vault, SubSchedule } = require('../src/models');
 

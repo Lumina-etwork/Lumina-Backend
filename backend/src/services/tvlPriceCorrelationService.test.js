@@ -167,8 +167,7 @@ describe('Correlation API Endpoints', () => {
   let app;
   
   beforeAll(async () => {
-    // Setup test app
-    app = require('../index');
+    app = require('../app').app;
   });
 
   describe('GET /api/correlation/analysis', () => {

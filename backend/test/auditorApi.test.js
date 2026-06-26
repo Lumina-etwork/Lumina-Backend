@@ -45,7 +45,7 @@ jest.mock("../src/services/firebaseService", () => ({
 }));
 
 const { sequelize } = require("../src/database/connection");
-const { app } = require("../src/index");
+const { app } = require("../src/app");
 const {
   Organization,
   Vault,

@@ -17,7 +17,7 @@ jest.mock('../src/services/indexingService', () => ({
   listenToEvents: jest.fn(),
 }));
 const { sequelize } = require('../src/database/connection');
-const app = require('../src/index');
+const { app } = require('../src/app');
 
 jest.setTimeout(60000);
 

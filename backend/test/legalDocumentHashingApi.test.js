@@ -16,7 +16,7 @@ jest.mock('../src/services/indexingService', () => ({
 }));
 
 const { sequelize } = require('../src/database/connection');
-const app = require('../src/index');
+const { app } = require('../src/app');
 const { Organization, Vault, VaultLegalDocument } = require('../src/models');
 
 jest.setTimeout(60000);

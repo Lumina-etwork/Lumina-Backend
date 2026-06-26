@@ -1,8 +1,11 @@
 const { Worker } = require('bullmq');
-const ioredis = require('ioredis');
-    console.error(`Error in worker for job ${job.id}:`, error);
-    throw error;
-  }
+const connection = {
+  host: process.env.REDIS_HOST || 'localhost',
+  port: parseInt(process.env.REDIS_PORT || '6379'),
+};
+
+const worker = new Worker('heavy-computation', async (job) => {
+  console.log(`Processing job ${job.id}:`, job.data);
 }, { connection });
 
 worker.on('completed', (job) => {
