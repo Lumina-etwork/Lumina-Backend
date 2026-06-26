@@ -377,7 +377,9 @@ KycStatus.createKycStatus = async function({
   verificationProvider = 'stellar',
   providerReferenceId,
   sep12ResponseData,
-  notificationPreferences
+  notificationPreferences,
+  softLockEnabled = false,
+  softLockReason = null,
 }) {
   return await this.create({
     user_address: userAddress,
@@ -396,7 +398,9 @@ KycStatus.createKycStatus = async function({
       push: true,
       sms: false,
       in_app: true
-    }
+    },
+    soft_lock_enabled: softLockEnabled,
+    soft_lock_reason: softLockReason,
   });
 };
 
@@ -407,6 +411,7 @@ KycStatus.findExpiringSoon = async function(daysThreshold = 7) {
   return await this.findAll({
     where: {
       expiration_date: {
+        [require('sequelize').Op.gt]: new Date(),
         [require('sequelize').Op.lte]: thresholdDate
       },
       kyc_status: {

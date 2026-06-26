@@ -16,8 +16,16 @@ const { KycStatus, KycNotification } = require('../models');
 const { sequelize } = require('../database/connection');
 
 // Mock external dependencies
-jest.mock('./notificationService');
-jest.mock('./slackWebhookService');
+jest.mock('./notificationService', () => ({
+  sendPushNotification: jest.fn().mockResolvedValue(),
+  sendEmailNotification: jest.fn().mockResolvedValue(),
+  isInitialized: jest.fn().mockReturnValue(true),
+}));
+jest.mock('./slackWebhookService', () => ({
+  sendKycAlert: jest.fn().mockResolvedValue(),
+  sendKycSummary: jest.fn().mockResolvedValue(),
+  sendKycReport: jest.fn().mockResolvedValue(),
+}));
 
 describe('KYCExpirationWorker', () => {
   let testKycStatuses = [];
@@ -394,7 +402,9 @@ describe('KYCExpirationWorker', () => {
         notificationType: 'EXPIRATION_WARNING',
         urgencyLevel: 'HIGH',
         title: 'Test Notification',
-        message: 'Test message'
+        message: 'Test message',
+        kycStatusAtNotification: 'VERIFIED',
+        expirationDateAtNotification: new Date()
       });
 
       await KycNotification.createNotification({
@@ -403,7 +413,9 @@ describe('KYCExpirationWorker', () => {
         notificationType: 'EXPIRED',
         urgencyLevel: 'CRITICAL',
         title: 'Test Notification 2',
-        message: 'Test message 2'
+        message: 'Test message 2',
+        kycStatusAtNotification: 'VERIFIED',
+        expirationDateAtNotification: new Date()
       });
 
       const stats = await KycNotification.getNotificationStatistics(user.user_address);

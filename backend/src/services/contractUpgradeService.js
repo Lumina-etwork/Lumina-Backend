@@ -134,7 +134,9 @@ class ContractUpgradeService {
       return proposal;
 
     } catch (error) {
-      await transaction.rollback();
+      if (transaction && !transaction.finished) {
+        try { await transaction.rollback(); } catch (_) {}
+      }
       Sentry.captureException(error);
       throw new Error(`Failed to create upgrade proposal: ${error.message}`);
     }
@@ -276,7 +278,9 @@ class ContractUpgradeService {
       };
 
     } catch (error) {
-      await transaction.rollback();
+      if (transaction && !transaction.finished) {
+        try { await transaction.rollback(); } catch (_) {}
+      }
       Sentry.captureException(error);
       throw new Error(`Failed to approve proposal: ${error.message}`);
     }
@@ -402,7 +406,9 @@ class ContractUpgradeService {
       };
 
     } catch (error) {
-      await transaction.rollback();
+      if (transaction && !transaction.finished) {
+        try { await transaction.rollback(); } catch (_) {}
+      }
       Sentry.captureException(error);
       throw new Error(`Failed to execute upgrade: ${error.message}`);
     }

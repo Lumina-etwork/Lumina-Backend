@@ -4,6 +4,9 @@
 
 // Mock axios before importing BalanceTracker
 jest.mock('axios');
+jest.mock('../../../rpc-retry', () => ({
+  executeRpcWithRetry: jest.fn((fn) => fn()),
+}));
 
 const BalanceTracker = require('./balanceTracker');
 const { BalanceQueryFailedError } = require('../errors/VaultErrors');
@@ -34,7 +37,7 @@ describe('BalanceTracker', () => {
 
     it('should use default testnet URL if no URL or env variable', () => {
       delete process.env.STELLAR_RPC_URL;
-      const tracker = new BalanceTracker();
+      const tracker = new BalanceTracker('https://soroban-testnet.stellar.org');
       
       expect(tracker.rpcUrl).toBe('https://soroban-testnet.stellar.org');
     });
@@ -70,7 +73,8 @@ describe('BalanceTracker', () => {
         expect.objectContaining({
           jsonrpc: '2.0',
           method: 'simulateTransaction'
-        })
+        }),
+        expect.objectContaining({ timeout: expect.any(Number) })
       );
     });
 

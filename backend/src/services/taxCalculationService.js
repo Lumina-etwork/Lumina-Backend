@@ -226,7 +226,7 @@ class TaxCalculationService {
       jurisdiction_code: jurisdictionCode,
       tax_year: taxYear || new Date().getFullYear(),
       tax_event_date: eventDate || new Date(),
-      tax_event_type: eventType,
+      event_type: eventType,
       token_amount: tokenAmount,
       token_price_usd: currentPriceUsd,
       total_value_usd: fmv,

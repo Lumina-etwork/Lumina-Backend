@@ -10,6 +10,13 @@ const {
   MultiSigConfig
 } = require('../models');
 
+// Mock auditLogger to prevent "auditLogger.log is not a function" errors
+jest.mock('./auditLogger', () => ({
+  log: jest.fn().mockResolvedValue(),
+  info: jest.fn().mockResolvedValue(),
+  error: jest.fn().mockResolvedValue(),
+}));
+
 describe('ContractUpgradeService', () => {
   let testVault;
   let testCertifiedBuild;
@@ -141,6 +148,7 @@ describe('ContractUpgradeService', () => {
     });
 
     it('should reject proposal with invalid WASM hash', async () => {
+      jest.spyOn(contractUpgradeService, 'checkAdminPermission').mockResolvedValue(true);
       jest.spyOn(wasmHashVerificationService, 'verifyWasmHash').mockResolvedValue({
         valid: false,
         error: 'WASM hash not found in certified builds'

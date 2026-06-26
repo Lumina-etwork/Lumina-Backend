@@ -62,6 +62,14 @@ const TaxCalculation = sequelize.define('TaxCalculation', {
     type: DataTypes.STRING,
     defaultValue: 'INTERNAL_FALLBACK',
   },
+  user_confirmed: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  auto_withhold_enabled: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
   status: {
     type: DataTypes.ENUM('PENDING', 'COMPLETED', 'FAILED'),
     defaultValue: 'PENDING',
