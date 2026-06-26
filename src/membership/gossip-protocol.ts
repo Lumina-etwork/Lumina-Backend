@@ -1,4 +1,4 @@
-import { MemberList, Member } from './member-list';
+import { MemberList, Member, MemberStatus } from './member-list';
 
 export class BloomFilter256 {
   private bits: Uint8Array = new Uint8Array(32); // 256 bits
@@ -62,6 +62,36 @@ export class GossipProtocol {
         member,
       });
     }
+  }
+
+  /**
+   * Propagates a local node-connection state change (connect/disconnect)
+   * across the cluster. Ensures monotonic ordering via incarnation bumps:
+   * a `connect` event always carries a higher incarnation than the
+   * preceding `disconnect` so that out-of-order delivery cannot cause
+   * split-brain.
+   */
+  propagateStateChange(
+    status: MemberStatus.Alive | MemberStatus.Dead,
+    nodeId: string,
+    address: string,
+    currentIncarnation: number,
+  ): void {
+    const nextIncarnation =
+      status === MemberStatus.Alive ? currentIncarnation + 1 : currentIncarnation;
+
+    const member: Member = {
+      id: nodeId,
+      address,
+      status,
+      incarnation: nextIncarnation,
+      lastUpdated: Date.now(),
+    };
+
+    // Apply locally first so local state is always correct
+    // regardless of how other nodes process the events.
+    this.memberList.addOrUpdateMember(member);
+    this.disseminateUpdate(member);
   }
 
   sendDigestSync(peerAddress: string): void {
