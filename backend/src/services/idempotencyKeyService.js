@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { IdempotencyKey } = require('../models');
+const { sequelize, IdempotencyKey } = require('../models');
 const { Op } = require('sequelize');
 
 class IdempotencyKeyService {

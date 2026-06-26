@@ -391,8 +391,9 @@ describe('PathPaymentAnalyticsService', () => {
       expect(stats.period).toBeDefined();
       expect(stats.overview).toBeDefined();
       expect(stats.topAssets).toBeDefined();
-      expect(stats.overview.total_conversions).toBe('2');
-      expect(stats.overview.unique_users).toBe('2');
+      // Sequelize aggregates may return numbers or strings depending on dialect
+      expect(Number(stats.overview.total_conversions)).toBe(2);
+      expect(Number(stats.overview.unique_users)).toBe(2);
     });
   });
 

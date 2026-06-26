@@ -48,6 +48,7 @@ const AdminAuditLog = require("./adminAuditLog");
 const GrantPriceSnapshot = require("./grantPriceSnapshot");
 const RoiCalculation = require("./roiCalculation");
 const ClaimWebhookDelivery = require("./claimWebhookDelivery");
+const IdempotencyKey = require("./idempotencyKey");
 const VestingStateReconciliation = require("./vestingStateReconciliation");
 
 const { Token, initTokenModel } = require("./token");
@@ -117,6 +118,7 @@ const models = {
   AdminAuditLog,
   GrantPriceSnapshot,
   RoiCalculation,
+  IdempotencyKey,
   VestingStateReconciliation,
   sequelize,
 };

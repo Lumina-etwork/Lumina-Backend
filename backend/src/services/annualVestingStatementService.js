@@ -318,7 +318,7 @@ class AnnualVestingStatementService {
         ),
         totalUSD: monthClaims.reduce((sum, claim) => {
           const claimValue = parseFloat(claim.amount_claimed) * parseFloat(claim.price_at_claim_usd || 0);
-          return this.addDecimal(sum, claimValue.toString()), '0';
+          return this.addDecimal(sum, claimValue.toString());
         }, '0'),
       });
     }
@@ -333,8 +333,7 @@ class AnnualVestingStatementService {
    * @returns {Promise<Buffer>} PDF buffer
    */
   async generateStatementPDF(statementData, year) {
-    // This will be implemented in the enhanced PDF service
-    return await pdfService.generateAnnualStatement(statementData, year);
+    return await annualStatementPDFService.generateAnnualStatement(statementData, year);
   }
 
   /**

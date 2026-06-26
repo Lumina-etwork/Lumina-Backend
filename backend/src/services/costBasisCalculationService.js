@@ -652,8 +652,16 @@ class CostBasisCalculationService {
    */
   async generateTaxReport(userAddress, taxYear) {
     try {
-      const startDate = new Date(taxYear, 0, 1);
-      const endDate = new Date(taxYear + 1, 0, 1);
+      // Validate tax year
+      const year = parseInt(taxYear);
+      if (isNaN(year) || year < 2000 || year > 2100) {
+        return {
+          success: false,
+          message: 'Invalid tax year',
+        };
+      }
+      const startDate = new Date(year, 0, 1);
+      const endDate = new Date(year + 1, 0, 1);
 
       // Get all conversion events in tax year
       const conversionEvents = await ConversionEvent.findAll({

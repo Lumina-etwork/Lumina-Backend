@@ -1,4 +1,5 @@
 const tvlPriceCorrelationService = require('../services/tvlPriceCorrelationService');
+const request = require('supertest');
 const { HistoricalTVL, HistoricalTokenPrice } = require('../models');
 
 describe('TVL-Price Correlation Service', () => {

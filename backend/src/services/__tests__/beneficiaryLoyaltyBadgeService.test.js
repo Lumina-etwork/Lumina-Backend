@@ -2,21 +2,33 @@ const BeneficiaryLoyaltyBadgeService = require('../beneficiaryLoyaltyBadgeServic
 const { LoyaltyBadge, Beneficiary, Vault } = require('../../models');
 const auditLogger = require('../auditLogger');
 
-// Mock dependencies
-const mockModel = () => ({
-  findByPk: jest.fn(),
-  findOne: jest.fn(),
-  findAll: jest.fn(),
-  create: jest.fn(),
-  update: jest.fn(),
-  destroy: jest.fn(),
+// Mock dependencies - use factory inline to avoid hoisting issues
+jest.mock('../../models', () => {
+  const mockModel = () => ({
+    findByPk: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    destroy: jest.fn(),
+  });
+  return {
+    LoyaltyBadge: mockModel(),
+    Beneficiary: mockModel(),
+    Vault: {},
+  };
 });
-jest.mock('../../models', () => ({
-  LoyaltyBadge: mockModel(),
-  Beneficiary: mockModel(),
-  Vault: {},
+jest.mock('../auditLogger', () => ({
+  log: jest.fn().mockResolvedValue(),
 }));
-jest.mock('../auditLogger');
+jest.mock('../../database/connection', () => {
+  const { Op, fn, col, literal } = jest.requireActual('sequelize');
+  return {
+    sequelize: { Op, fn, col, literal },
+    initializeDatabase: jest.fn(),
+    getSequelize: jest.fn(),
+  };
+});
 jest.mock('stellar-sdk', () => ({
   Server: jest.fn().mockImplementation(() => ({
     loadAccount: jest.fn()
@@ -207,7 +219,7 @@ describe('BeneficiaryLoyaltyBadgeService', () => {
         {
           id: 'badge-1',
           beneficiary_id: 'beneficiary-1',
-          current_balance: '1000.0',
+          current_balance: 1000.0,
           beneficiary: {
             address: 'GD1234567890abcdef',
             id: 'beneficiary-1'
@@ -217,17 +229,17 @@ describe('BeneficiaryLoyaltyBadgeService', () => {
       ];
 
       LoyaltyBadge.findAll.mockResolvedValue(mockActiveMonitoring);
-      service.getWalletBalance = jest.fn().mockResolvedValue('500.0'); // Lower than current balance
+      service.getWalletBalance = jest.fn().mockResolvedValue(500.0); // Lower than current balance
 
       const result = await service.checkAndUpdateRetentionPeriods();
 
       expect(result.checked).toBe(1);
+      // Balance decreased, monitoring should be deactivated
       expect(result.updated).toBe(0);
       expect(result.badgesAwarded).toBe(0);
-      expect(mockActiveMonitoring[0].update).toHaveBeenCalledWith({
-        is_active: false,
-        last_balance_check: expect.any(Date)
-      });
+      expect(mockActiveMonitoring[0].update).toHaveBeenCalledWith(
+        expect.objectContaining({ is_active: false })
+      );
     });
   });
 

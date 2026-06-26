@@ -5,6 +5,43 @@ const sequelize = require('../database/connection');
 
 // Mock dependencies
 jest.mock('./sorobanRpcClient');
+
+// Mock RpcQueueService to avoid QueueService constructor issue
+// The test file is in src/services/ so './rpcQueueService' is the correct path
+jest.mock('./rpcQueueService', () => {
+  const mockRpcQueueService = {
+    start: jest.fn().mockResolvedValue(),
+    stop: jest.fn().mockResolvedValue(),
+    addRpcJob: jest.fn().mockResolvedValue({
+      id: 'mock-job-id',
+      finished: jest.fn().mockResolvedValue({ success: true, result: { events: [] } }),
+    }),
+    getStats: jest.fn().mockResolvedValue({
+      service: { isStarted: false },
+      queues: {},
+      jobs: {},
+    }),
+  };
+  return jest.fn(() => mockRpcQueueService);
+});
+
+// Mock other dependent services
+jest.mock('./stellarIngestionService', () => ({}));
+jest.mock('./ledgerReorgDetector', () => {
+  return jest.fn().mockImplementation(() => ({
+    start: jest.fn(),
+    stop: jest.fn(),
+    triggerCheck: jest.fn().mockResolvedValue({ issues: [] }),
+    isRunning: false,
+    getStatus: jest.fn().mockReturnValue({}),
+  }));
+});
+jest.mock('./ledgerResyncService', () => {
+  return jest.fn().mockImplementation(() => ({
+    getStatus: jest.fn().mockReturnValue({}),
+  }));
+});
+
 const makeMockModel = () => ({
   findAll: jest.fn(), findByPk: jest.fn(), findOne: jest.fn(),
   create: jest.fn(), update: jest.fn(), destroy: jest.fn(), max: jest.fn(),
@@ -366,12 +403,12 @@ describe('SorobanEventPollerService', () => {
   });
 
   describe('getStatus', () => {
-    it('should return correct status', () => {
+    it('should return correct status', async () => {
       service.isRunning = true;
       service.startTime = Date.now() - 60000; // 1 minute ago
       service.lastPollTime = Date.now() - 30000; // 30 seconds ago
 
-      const status = service.getStatus();
+      const status = await service.getStatus();
 
       expect(status).toEqual({
         isRunning: true,
@@ -380,7 +417,10 @@ describe('SorobanEventPollerService', () => {
         contractAddresses: [],
         uptime: expect.any(Number),
         lastPoll: service.lastPollTime,
-        serviceName: 'soroban-event-poller'
+        serviceName: 'soroban-event-poller',
+        reorgDetector: expect.any(Object),
+        resyncService: expect.any(Object),
+        rpcQueueService: expect.any(Object)
       });
     });
   });

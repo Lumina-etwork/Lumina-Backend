@@ -63,7 +63,11 @@ describe('TaxCalculationService', () => {
       vesting_start_date: new Date('2024-01-01'),
       vesting_duration: 365 * 24 * 60 * 60, // 1 year in seconds
       cliff_date: new Date('2024-01-01'),
-      top_up_amount: '1000'
+      top_up_amount: '1000',
+      start_timestamp: new Date('2024-01-01'),
+      end_timestamp: new Date('2025-01-01'),
+      transaction_hash: '0x' + 'a'.repeat(64),
+      cliff_duration: 0
     });
   });
 

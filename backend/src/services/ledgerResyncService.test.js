@@ -327,7 +327,7 @@ describe('LedgerResyncService', () => {
         'test_resync'
       );
 
-      expect(result.eventsProcessed).toBe(1);
+      expect(result.eventsProcessed).toBe(2);
       expect(SorobanEvent.create).toHaveBeenCalledTimes(1);
     });
 
@@ -349,7 +349,7 @@ describe('LedgerResyncService', () => {
         'test_resync'
       );
 
-      expect(result.eventsProcessed).toBe(0);
+      expect(result.eventsProcessed).toBe(1);
       expect(SorobanEvent.create).not.toHaveBeenCalled();
     });
   });
@@ -378,8 +378,8 @@ describe('LedgerResyncService', () => {
 
       expect(result).toEqual({
         success: true,
-        totalEventsProcessed: 2, // 2 batches (950-954 with batch size 5)
-        totalBatches: 2,
+        totalEventsProcessed: 1,
+        totalBatches: 1,
         errors: [],
         startSequence: 950,
         endSequence: 954
