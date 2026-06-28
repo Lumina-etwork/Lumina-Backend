@@ -1,218 +1,171 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, testutils::Address as TestAddress};
-use vesting_vault::{VestingVault, Vault, DataKey as VaultDataKey};
-use malicious_contract::{MaliciousContract, AttackState, DataKey as MaliciousDataKey};
 
-#[contract]
-pub struct ReentrancyTests;
+use soroban_sdk::{Address, Env, Symbol, Vec, Val, IntoVal, vec};
+use soroban_sdk::testutils::{Address as _, Ledger};
+use vesting_vault::{Vault, VestingVault, DataKey as VaultDataKey};
+use malicious_contract::{AttackState, MaliciousContract, DataKey as MaliciousDataKey};
 
-#[contractimpl]
-impl ReentrancyTests {
-    /// Run comprehensive reentrancy tests
-    pub fn run_reentrancy_tests(env: Env) -> bool {
-        // Test 1: Basic reentrancy protection on claim()
-        let test1_result = Self::test_claim_reentrancy_protection(&env);
-        
-        // Test 2: Reentrancy protection on revoke() during claim()
-        let test2_result = Self::test_revoke_reentrancy_protection(&env);
-        
-        // Test 3: Reentrancy protection on create_vault() during claim()
-        let test3_result = Self::test_create_vault_reentrancy_protection(&env);
-        
-        // Test 4: Verify CEI pattern prevents state corruption
-        let test4_result = Self::test_cei_pattern_protection(&env);
-        
-        test1_result && test2_result && test3_result && test4_result
-    }
-
-    /// Test that claim() is protected against reentrancy
-    fn test_claim_reentrancy_protection(env: &Env) -> bool {
-        let admin = Address::generate(env);
-        let beneficiary = Address::generate(env);
-        let attacker = Address::generate(env);
-
-        // Deploy contracts
-        let vault_contract_id = env.register_contract(None, VestingVault);
-        let vault_contract = VestingVaultClient::new(env, &vault_contract_id);
-        
-        let malicious_contract_id = env.register_contract(None, MaliciousContract);
-        let malicious_contract = MaliciousContractClient::new(env, &malicious_contract_id);
-
-        // Initialize contracts
-        vault_contract.initialize(&admin);
-        
-        // Create a vault
-        let vault_id = vault_contract.create_vault(
-            &beneficiary,
-            &1000i128,
-            &1000u64,
-            &1000u64,
-            &1000u64,
-            &true
-        );
-
-        // Initialize malicious contract
-        malicious_contract.initialize(&vault_contract_id, &vault_id);
-
-        // Set up time for vesting
-        env.ledger().set_timestamp(2000u64);
-
-        // Attempt reentrancy attack
-        let attack_successful = malicious_contract.attempt_claim_reentrancy();
-        
-        // Should fail - reentrancy should be blocked
-        !attack_successful
-    }
-
-    /// Test that revoke() is protected during claim()
-    fn test_revoke_reentrancy_protection(env: &Env) -> bool {
-        let admin = Address::generate(env);
-        let beneficiary = Address::generate(env);
-
-        // Deploy contracts
-        let vault_contract_id = env.register_contract(None, VestingVault);
-        let vault_contract = VestingVaultClient::new(env, &vault_contract_id);
-        
-        let malicious_contract_id = env.register_contract(None, MaliciousContract);
-        let malicious_contract = MaliciousContractClient::new(env, &malicious_contract_id);
-
-        // Initialize contracts
-        vault_contract.initialize(&admin);
-        
-        // Create a revocable vault
-        let vault_id = vault_contract.create_vault(
-            &beneficiary,
-            &1000i128,
-            &1000u64,
-            &1000u64,
-            &1000u64,
-            &true
-        );
-
-        // Initialize malicious contract
-        malicious_contract.initialize(&vault_contract_id, &vault_id);
-
-        // Set up time for vesting
-        env.ledger().set_timestamp(2000u64);
-
-        // Attempt reentrancy attack
-        let attack_successful = malicious_contract.attempt_revoke_reentrancy();
-        
-        // Should fail - reentrancy should be blocked
-        !attack_successful
-    }
-
-    /// Test that create_vault() is protected during claim()
-    fn test_create_vault_reentrancy_protection(env: &Env) -> bool {
-        let admin = Address::generate(env);
-        let beneficiary = Address::generate(env);
-        let new_beneficiary = Address::generate(env);
-
-        // Deploy contracts
-        let vault_contract_id = env.register_contract(None, VestingVault);
-        let vault_contract = VestingVaultClient::new(env, &vault_contract_id);
-        
-        let malicious_contract_id = env.register_contract(None, MaliciousContract);
-        let malicious_contract = MaliciousContractClient::new(env, &malicious_contract_id);
-
-        // Initialize contracts
-        vault_contract.initialize(&admin);
-        
-        // Create a vault
-        let vault_id = vault_contract.create_vault(
-            &beneficiary,
-            &1000i128,
-            &1000u64,
-            &1000u64,
-            &1000u64,
-            &true
-        );
-
-        // Initialize malicious contract
-        malicious_contract.initialize(&vault_contract_id, &vault_id);
-
-        // Set up time for vesting
-        env.ledger().set_timestamp(2000u64);
-
-        // Attempt reentrancy attack
-        let attack_successful = malicious_contract.attempt_create_vault_reentrancy(&new_beneficiary);
-        
-        // Should fail - reentrancy should be blocked
-        !attack_successful
-    }
-
-    /// Test that CEI pattern prevents state corruption
-    fn test_cei_pattern_protection(env: &Env) -> bool {
-        let admin = Address::generate(env);
-        let beneficiary = Address::generate(env);
-
-        // Deploy contracts
-        let vault_contract_id = env.register_contract(None, VestingVault);
-        let vault_contract = VestingVaultClient::new(env, &vault_contract_id);
-
-        // Initialize contract
-        vault_contract.initialize(&admin);
-        
-        // Create a vault
-        let vault_id = vault_contract.create_vault(
-            &beneficiary,
-            &1000i128,
-            &1000u64,
-            &1000u64,
-            &1000u64,
-            &true
-        );
-
-        // Get initial state
-        let initial_vault = vault_contract.get_vault_info(&vault_id);
-        
-        // Set up time for vesting
-        env.ledger().set_timestamp(2000u64);
-
-        // Claim tokens
-        let claimed_amount = vault_contract.claim(&vault_id);
-        
-        // Get final state
-        let final_vault = vault_contract.get_vault_info(&vault_id);
-
-        // Verify state consistency
-        let expected_released = initial_vault.released_amount + claimed_amount;
-        final_vault.released_amount == expected_released && 
-        final_vault.total_amount == initial_vault.total_amount &&
-        claimed_amount > 0
-    }
-
-    /// Test normal operation without reentrancy attempts
-    pub fn test_normal_operation(env: Env) -> bool {
-        let admin = Address::generate(&env);
-        let beneficiary = Address::generate(&env);
-
-        // Deploy contract
-        let vault_contract_id = env.register_contract(None, VestingVault);
-        let vault_contract = VestingVaultClient::new(&env, &vault_contract_id);
-
-        // Initialize contract
-        vault_contract.initialize(&admin);
-        
-        // Create a vault
-        let vault_id = vault_contract.create_vault(
-            &beneficiary,
-            &1000i128,
-            &1000u64,
-            &1000u64,
-            &1000u64,
-            &true
-        );
-
-        // Test normal claim after vesting
-        env.ledger().set_timestamp(2000u64);
-        let claimed_amount = vault_contract.claim(&vault_id);
-        
-        claimed_amount > 0
-    }
+pub fn run_reentrancy_tests(env: &Env) -> bool {
+    let test1_result = test_claim_reentrancy_protection(env);
+    let test2_result = test_revoke_reentrancy_protection(env);
+    let test3_result = test_create_vault_reentrancy_protection(env);
+    let test4_result = test_cei_pattern_protection(env);
+    test1_result && test2_result && test3_result && test4_result
 }
 
-// Client wrappers for testing
+fn test_claim_reentrancy_protection(env: &Env) -> bool {
+    let admin = Address::generate(env);
+    let beneficiary = Address::generate(env);
+    let attacker = Address::generate(env);
+
+    let vault_contract_id = env.register_contract(None, VestingVault);
+    let vault_contract = VestingVaultClient::new(env, &vault_contract_id);
+
+    let malicious_contract_id = env.register_contract(None, MaliciousContract);
+    let malicious_contract = MaliciousContractClient::new(env, &malicious_contract_id);
+
+    env.mock_all_auths();
+    vault_contract.initialize(&admin);
+
+    let vault_id = vault_contract.create_vault(
+        &beneficiary,
+        &1000i128,
+        &1000u64,
+        &1000u64,
+        &1000u64,
+        &true
+    );
+
+    malicious_contract.initialize(&vault_contract_id, &vault_id);
+
+    env.ledger().set_timestamp(2000u64);
+
+    let attack_successful = malicious_contract.attempt_claim_reentrancy();
+
+    !attack_successful
+}
+
+fn test_revoke_reentrancy_protection(env: &Env) -> bool {
+    let admin = Address::generate(env);
+    let beneficiary = Address::generate(env);
+
+    let vault_contract_id = env.register_contract(None, VestingVault);
+    let vault_contract = VestingVaultClient::new(env, &vault_contract_id);
+
+    let malicious_contract_id = env.register_contract(None, MaliciousContract);
+    let malicious_contract = MaliciousContractClient::new(env, &malicious_contract_id);
+
+    env.mock_all_auths();
+    vault_contract.initialize(&admin);
+
+    let vault_id = vault_contract.create_vault(
+        &beneficiary,
+        &1000i128,
+        &1000u64,
+        &1000u64,
+        &1000u64,
+        &true
+    );
+
+    malicious_contract.initialize(&vault_contract_id, &vault_id);
+
+    env.ledger().set_timestamp(2000u64);
+
+    let attack_successful = malicious_contract.attempt_revoke_reentrancy();
+
+    !attack_successful
+}
+
+fn test_create_vault_reentrancy_protection(env: &Env) -> bool {
+    let admin = Address::generate(env);
+    let beneficiary = Address::generate(env);
+    let new_beneficiary = Address::generate(env);
+
+    let vault_contract_id = env.register_contract(None, VestingVault);
+    let vault_contract = VestingVaultClient::new(env, &vault_contract_id);
+
+    let malicious_contract_id = env.register_contract(None, MaliciousContract);
+    let malicious_contract = MaliciousContractClient::new(env, &malicious_contract_id);
+
+    env.mock_all_auths();
+    vault_contract.initialize(&admin);
+
+    let vault_id = vault_contract.create_vault(
+        &beneficiary,
+        &1000i128,
+        &1000u64,
+        &1000u64,
+        &1000u64,
+        &true
+    );
+
+    malicious_contract.initialize(&vault_contract_id, &vault_id);
+
+    env.ledger().set_timestamp(2000u64);
+
+    let attack_successful = malicious_contract.attempt_create_vault_reentrancy(&new_beneficiary);
+
+    !attack_successful
+}
+
+fn test_cei_pattern_protection(env: &Env) -> bool {
+    let admin = Address::generate(env);
+    let beneficiary = Address::generate(env);
+
+    let vault_contract_id = env.register_contract(None, VestingVault);
+    let vault_contract = VestingVaultClient::new(env, &vault_contract_id);
+
+    env.mock_all_auths();
+    vault_contract.initialize(&admin);
+
+    let vault_id = vault_contract.create_vault(
+        &beneficiary,
+        &1000i128,
+        &1000u64,
+        &1000u64,
+        &1000u64,
+        &true
+    );
+
+    let initial_vault = vault_contract.get_vault_info(&vault_id);
+
+    env.ledger().set_timestamp(2000u64);
+
+    let claimed_amount = vault_contract.claim(&vault_id);
+
+    let final_vault = vault_contract.get_vault_info(&vault_id);
+
+    let expected_released = initial_vault.released_amount + claimed_amount;
+    final_vault.released_amount == expected_released &&
+    final_vault.total_amount == initial_vault.total_amount &&
+    claimed_amount > 0
+}
+
+pub fn test_normal_operation(env: &Env) -> bool {
+    let admin = Address::generate(env);
+    let beneficiary = Address::generate(env);
+
+    let vault_contract_id = env.register_contract(None, VestingVault);
+    let vault_contract = VestingVaultClient::new(env, &vault_contract_id);
+
+    env.mock_all_auths();
+    vault_contract.initialize(&admin);
+
+    let vault_id = vault_contract.create_vault(
+        &beneficiary,
+        &1000i128,
+        &1000u64,
+        &1000u64,
+        &1000u64,
+        &true
+    );
+
+    env.ledger().set_timestamp(2000u64);
+    let claimed_amount = vault_contract.claim(&vault_id);
+
+    claimed_amount > 0
+}
+
 #[derive(Clone)]
 pub struct VestingVaultClient<'a> {
     contract_id: &'a Address,
@@ -228,7 +181,7 @@ impl<'a> VestingVaultClient<'a> {
         self.env.invoke_contract::<()>(
             self.contract_id,
             &Symbol::new(self.env, "initialize"),
-            (admin,),
+            vec![self.env, admin.to_val()],
         );
     }
 
@@ -244,23 +197,31 @@ impl<'a> VestingVaultClient<'a> {
         self.env.invoke_contract::<Address>(
             self.contract_id,
             &Symbol::new(self.env, "create_vault"),
-            (beneficiary, total_amount, cliff_date, vesting_start, vesting_duration, revocable),
-        ).unwrap()
+            vec![
+                self.env,
+                beneficiary.to_val(),
+                total_amount.into_val(self.env),
+                cliff_date.into_val(self.env),
+                vesting_start.into_val(self.env),
+                vesting_duration.into_val(self.env),
+                revocable.into_val(self.env),
+            ],
+        )
     }
 
     pub fn claim(&self, vault_id: &Address) -> i128 {
         self.env.invoke_contract::<i128>(
             self.contract_id,
             &Symbol::new(self.env, "claim"),
-            (vault_id,),
-        ).unwrap()
+            vec![self.env, vault_id.to_val()],
+        )
     }
 
     pub fn revoke(&self, vault_id: &Address) {
         self.env.invoke_contract::<()>(
             self.contract_id,
             &Symbol::new(self.env, "revoke"),
-            (vault_id,),
+            vec![self.env, vault_id.to_val()],
         );
     }
 
@@ -268,8 +229,8 @@ impl<'a> VestingVaultClient<'a> {
         self.env.invoke_contract::<Vault>(
             self.contract_id,
             &Symbol::new(self.env, "get_vault_info"),
-            (vault_id,),
-        ).unwrap()
+            vec![self.env, vault_id.to_val()],
+        )
     }
 }
 
@@ -288,7 +249,7 @@ impl<'a> MaliciousContractClient<'a> {
         self.env.invoke_contract::<()>(
             self.contract_id,
             &Symbol::new(self.env, "initialize"),
-            (vault_contract, vault_id),
+            vec![self.env, vault_contract.to_val(), vault_id.to_val()],
         );
     }
 
@@ -296,71 +257,42 @@ impl<'a> MaliciousContractClient<'a> {
         self.env.invoke_contract::<bool>(
             self.contract_id,
             &Symbol::new(self.env, "attempt_claim_reentrancy"),
-            (),
-        ).unwrap()
+            Vec::new(self.env),
+        )
     }
 
     pub fn attempt_revoke_reentrancy(&self) -> bool {
         self.env.invoke_contract::<bool>(
             self.contract_id,
             &Symbol::new(self.env, "attempt_revoke_reentrancy"),
-            (),
-        ).unwrap()
+            Vec::new(self.env),
+        )
     }
 
     pub fn attempt_create_vault_reentrancy(&self, beneficiary: &Address) -> bool {
         self.env.invoke_contract::<bool>(
             self.contract_id,
             &Symbol::new(self.env, "attempt_create_vault_reentrancy"),
-            (beneficiary,),
-        ).unwrap()
+            vec![self.env, beneficiary.to_val()],
+        )
     }
 
     pub fn get_attack_info(&self) -> AttackState {
         self.env.invoke_contract::<AttackState>(
             self.contract_id,
             &Symbol::new(self.env, "get_attack_info"),
-            (),
-        ).unwrap()
+            Vec::new(self.env),
+        )
     }
 
     pub fn reset_attack_state(&self) {
         self.env.invoke_contract::<()>(
             self.contract_id,
             &Symbol::new(self.env, "reset_attack_state"),
-            (),
+            Vec::new(self.env),
         );
     }
 }
 
 #[cfg(test)]
 mod tests;
-
-// Client wrapper for test contract
-#[derive(Clone)]
-pub struct ReentrancyTestsClient<'a> {
-    contract_id: &'a Address,
-    env: &'a Env,
-}
-
-impl<'a> ReentrancyTestsClient<'a> {
-    pub fn new(env: &'a Env, contract_id: &'a Address) -> Self {
-        Self { contract_id, env }
-    }
-
-    pub fn run_reentrancy_tests(&self) -> bool {
-        self.env.invoke_contract::<bool>(
-            self.contract_id,
-            &Symbol::new(self.env, "run_reentrancy_tests"),
-            (),
-        ).unwrap()
-    }
-
-    pub fn test_normal_operation(&self) -> bool {
-        self.env.invoke_contract::<bool>(
-            self.contract_id,
-            &Symbol::new(self.env, "test_normal_operation"),
-            (),
-        ).unwrap()
-    }
-}

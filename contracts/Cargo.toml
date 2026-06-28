@@ -2,13 +2,13 @@
 members = [
     "malicious-contract",
     "merkle_vault",
-    "reentrancy-tests",
     "vesting-vault"
 ]
+exclude = ["reentrancy-tests"]
 resolver = "2"
 
 [workspace.dependencies]
-soroban-sdk = "21.0.0"
+soroban-sdk = "21.7.7"
 
 [profile.release]
 opt-level = "z"

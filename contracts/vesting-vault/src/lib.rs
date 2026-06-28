@@ -95,7 +95,10 @@ impl VestingVault {
         };
 
         env.storage().instance().set(&DataKey::Vault(vault_id.clone()), &vault);
-        
+
+        // Clear guard before returning
+        Self::clear_reentrancy_guard(&env);
+
         // INTERACTIONS - No external calls in this function, safe pattern
         vault_id
     }
@@ -119,6 +122,9 @@ impl VestingVault {
         let mut updated_vault = vault.clone();
         updated_vault.released_amount += claimable_amount;
         env.storage().instance().set(&DataKey::Vault(vault_id), &updated_vault);
+
+        // Clear guard before returning
+        Self::clear_reentrancy_guard(&env);
 
         // INTERACTIONS - External call would go here (e.g., token transfer)
         // For this example, we just return the amount
@@ -149,6 +155,9 @@ impl VestingVault {
         let mut updated_vault = vault;
         updated_vault.revoked = true;
         env.storage().instance().set(&DataKey::Vault(vault_id), &updated_vault);
+
+        // Clear guard before returning
+        Self::clear_reentrancy_guard(&env);
 
         // INTERACTIONS - External calls would go here (e.g., refund tokens)
         // For this example, we just mark as revoked
