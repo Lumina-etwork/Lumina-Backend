@@ -17,12 +17,11 @@ class AuthService {
    * @returns {string} JWT token
    */
   generateAccessToken(userAddress, role = 'user') {
-    const { v4: uuidv4 } = require('uuid');
     const payload = {
       address: userAddress,
       role: role,
       type: 'access',
-      jti: uuidv4()
+      jti: Date.now().toString(36) + Math.random().toString(36).substring(2)
     };
 
     return jwt.sign(payload, process.env.JWT_SECRET, {
