@@ -62,7 +62,7 @@ class EmailService {
         'email',
         to,
         emailPayload,
-        `email_${to}_${subject}_${Date.now()}`
+        `email_${to}_${subject}`
       );
 
       // Execute email with idempotency protection
@@ -78,7 +78,8 @@ class EmailService {
             responseStatus: 200, // SMTP success
             responseBody: info.messageId,
           };
-        }
+        },
+        idempotencyKey
       );
 
       if (result.success) {

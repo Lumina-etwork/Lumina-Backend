@@ -4,6 +4,8 @@ jest.mock('../models', () => ({
     findAll: jest.fn(),
   },
   ClaimWebhookDelivery: {
+    findOne: jest.fn(),
+    create: jest.fn(),
     findOrCreate: jest.fn(),
     findByPk: jest.fn(),
     findAll: jest.fn(),
@@ -19,6 +21,14 @@ const mockClaimEventEmitter = new EventEmitter();
 
 jest.mock('./indexingService', () => ({
   claimEventEmitter: mockClaimEventEmitter,
+}));
+
+jest.mock('./idempotencyKeyService', () => ({
+  generateIdempotencyKey: jest.fn((_type, _url, _payload, providedKey) => providedKey || 'mock-key'),
+  executeWithIdempotency: jest.fn(async (_type, _url, _payload, operation) => {
+    const result = await operation();
+    return { success: true, fromCache: false, ...result };
+  }),
 }));
 
 const axios = require('axios');
@@ -75,6 +85,31 @@ describe('Claim webhook dispatcher integration', () => {
     ]);
     Beneficiary.findAll.mockResolvedValue([]);
     ClaimWebhookDelivery.findAll.mockResolvedValue([]);
+    ClaimWebhookDelivery.findOne.mockImplementation(async ({ where }) => {
+      const lookupKey = `${where.organization_webhook_id}:${where.event_key}`;
+      return deliveriesByKey.get(lookupKey) || null;
+    });
+
+    ClaimWebhookDelivery.create.mockImplementation(async (attrs) => {
+      const lookupKey = `${attrs.organization_webhook_id}:${attrs.event_key}`;
+
+      const delivery = {
+        id: `delivery-${++deliverySequence}`,
+        attempt_count: 0,
+        created_at: new Date().toISOString(),
+        ...attrs,
+      };
+
+      delivery.update = jest.fn().mockImplementation(async (updateAttrs) => {
+        Object.assign(delivery, updateAttrs);
+        return delivery;
+      });
+
+      deliveriesByKey.set(lookupKey, delivery);
+      deliveriesById.set(delivery.id, delivery);
+      return delivery;
+    });
+
     ClaimWebhookDelivery.findOrCreate.mockImplementation(async ({ where, defaults }) => {
       const lookupKey = `${where.organization_webhook_id}:${where.event_key}`;
       const existing = deliveriesByKey.get(lookupKey);
@@ -184,7 +219,7 @@ describe('Claim webhook dispatcher integration', () => {
     mockClaimEventEmitter.emit('tokensClaimed', claimEvent);
     await flushEventDispatch();
 
-    expect(ClaimWebhookDelivery.findOrCreate).toHaveBeenCalledTimes(2);
+    expect(ClaimWebhookDelivery.findOne).toHaveBeenCalledTimes(2);
     expect(axios.post).toHaveBeenCalledTimes(1);
     expect(deliveriesById.get('delivery-1').delivery_status).toBe('success');
   });

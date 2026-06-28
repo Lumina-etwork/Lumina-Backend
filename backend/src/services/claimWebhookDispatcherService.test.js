@@ -8,7 +8,8 @@ jest.mock('../models', () => ({
     findAll: jest.fn(),
   },
   ClaimWebhookDelivery: {
-    findOrCreate: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
     findByPk: jest.fn(),
     findAll: jest.fn(),
   },
@@ -61,14 +62,12 @@ describe('ClaimWebhookDispatcherService', () => {
         webhook_url: 'https://client.example.com/webhooks/claims',
       },
     ]);
-    ClaimWebhookDelivery.findOrCreate.mockResolvedValue([
-      {
-        id: 'delivery-1',
-        delivery_status: 'pending',
-        update,
-      },
-      true,
-    ]);
+    ClaimWebhookDelivery.findOne.mockResolvedValue(null);
+    ClaimWebhookDelivery.create.mockResolvedValue({
+      id: 'delivery-1',
+      delivery_status: 'pending',
+      update,
+    });
 
     const result = await service.enqueueTokensClaimedEvent({
       event_id: 'event-1',
@@ -77,7 +76,6 @@ describe('ClaimWebhookDispatcherService', () => {
       claim_timestamp: '2026-04-22T00:00:00.000Z',
       transaction_hash: 'tx-123',
       block_number: 456,
-      token_address: 'TOKEN-1',
       organization_id: 'org-1',
     });
 
@@ -112,14 +110,11 @@ describe('ClaimWebhookDispatcherService', () => {
         webhook_url: 'https://client.example.com/webhooks/claims',
       },
     ]);
-    ClaimWebhookDelivery.findOrCreate.mockResolvedValue([
-      {
-        id: 'delivery-1',
-        delivery_status: 'success',
-        update: jest.fn(),
-      },
-      false,
-    ]);
+    ClaimWebhookDelivery.findOne.mockResolvedValue({
+      id: 'delivery-1',
+      delivery_status: 'success',
+      update: jest.fn(),
+    });
 
     const result = await service.enqueueTokensClaimedEvent({
       event_id: 'event-1',
@@ -145,14 +140,12 @@ describe('ClaimWebhookDispatcherService', () => {
         webhook_url: 'http://client.example.com/webhooks/claims',
       },
     ]);
-    ClaimWebhookDelivery.findOrCreate.mockResolvedValue([
-      {
-        id: 'delivery-1',
-        delivery_status: 'pending',
-        update,
-      },
-      true,
-    ]);
+    ClaimWebhookDelivery.findOne.mockResolvedValue(null);
+    ClaimWebhookDelivery.create.mockResolvedValue({
+      id: 'delivery-1',
+      delivery_status: 'pending',
+      update,
+    });
 
     const result = await service.enqueueTokensClaimedEvent({
       event_id: 'event-1',
@@ -200,14 +193,12 @@ describe('ClaimWebhookDispatcherService', () => {
         webhook_url: 'https://client.example.com/webhooks/claims',
       },
     ]);
-    ClaimWebhookDelivery.findOrCreate.mockResolvedValue([
-      {
-        id: 'delivery-1',
-        delivery_status: 'pending',
-        update,
-      },
-      true,
-    ]);
+    ClaimWebhookDelivery.findOne.mockResolvedValue(null);
+    ClaimWebhookDelivery.create.mockResolvedValue({
+      id: 'delivery-1',
+      delivery_status: 'pending',
+      update,
+    });
 
     const result = await service.enqueueTokensClaimedEvent({
       event_id: 'event-1',

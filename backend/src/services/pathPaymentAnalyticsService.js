@@ -111,7 +111,7 @@ class PathPaymentAnalyticsService {
         total_vested_amount: reportData.totalVestedAmount,
         total_cost_basis_usd: reportData.totalCostBasisUSD,
         total_milestones: reportData.totalEvents,
-        report_data: reportData.detailedBreakdown
+        report_data: reportData
       }
     });
 
@@ -120,7 +120,7 @@ class PathPaymentAnalyticsService {
         total_vested_amount: reportData.totalVestedAmount,
         total_cost_basis_usd: reportData.totalCostBasisUSD,
         total_milestones: reportData.totalEvents,
-        report_data: reportData.detailedBreakdown
+        report_data: reportData
       });
     }
 
@@ -251,7 +251,11 @@ class PathPaymentAnalyticsService {
       limit: 10
     });
 
-    // Get monthly trends
+    // Get monthly trends (uses dialect-appropriate date truncation)
+    const dateTrunc = sequelize.options.dialect === 'sqlite'
+      ? fn('strftime', '%Y-%m-01', col('transaction_timestamp'))
+      : fn('DATE_TRUNC', 'month', col('transaction_timestamp'));
+
     const monthlyTrends = await ConversionEvent.findAll({
       where: {
         user_address: userAddress,
@@ -260,12 +264,12 @@ class PathPaymentAnalyticsService {
         }
       },
       attributes: [
-        [fn('DATE_TRUNC', 'month', col('transaction_timestamp')), 'month'],
+        [dateTrunc, 'month'],
         [fn('COUNT', col('id')), 'conversions'],
         [fn('SUM', col('destination_amount')), 'total_amount']
       ],
-      group: [fn('DATE_TRUNC', 'month', col('transaction_timestamp'))],
-      order: [[fn('DATE_TRUNC', 'month', col('transaction_timestamp')), 'ASC']]
+      group: [dateTrunc],
+      order: [[dateTrunc, 'ASC']]
     });
 
     return {

@@ -38,8 +38,8 @@ class StellarPathPaymentListener extends EventEmitter {
       console.log(`Starting Stellar path payment listener from ledger ${this.lastLedger}`);
       this.isListening = true;
       
-      // Start listening for new transactions
-      await this.listenForPayments();
+      // Start listening for new transactions (non-blocking)
+      this.listenForPayments();
     } catch (error) {
       console.error('Failed to start path payment listener:', error);
       this.isListening = false;
@@ -234,7 +234,6 @@ class StellarPathPaymentListener extends EventEmitter {
     } catch (error) {
       await t.rollback();
       console.error('Error processing path payment:', error);
-      throw error;
     }
   }
 

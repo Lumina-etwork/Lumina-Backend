@@ -1,4 +1,4 @@
-const { Vault, TVL } = require('../models');
+const { Vault, TVL, HistoricalTVL } = require('../models');
 const cacheService = require('./cacheService');
 const requestDeduplicationMiddleware = require('../middleware/requestDeduplication.middleware');
 

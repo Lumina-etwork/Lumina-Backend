@@ -121,7 +121,8 @@ const recordClaimComplianceMiddleware = async (req, res, next) => {
     await rule144ComplianceService.recordClaimAttempt(
       vault_id,
       user_address,
-      amount_claimed
+      amount_claimed,
+      new Date()
     );
 
     console.log(`RULE 144 CLAIM RECORDED: User ${user_address} claimed ${amount_claimed} from vault ${vault_id}`);

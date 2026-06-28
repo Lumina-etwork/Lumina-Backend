@@ -15,6 +15,16 @@ function initTokenModel(sequelize) {
         allowNull: false,
         unique: true,
       },
+      code: {
+        type: DataTypes.STRING(32),
+        allowNull: true,
+        comment: 'Asset code (e.g., "USDC", "XLM")',
+      },
+      issuer: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'Asset issuer address',
+      },
       symbol: {
         type: DataTypes.STRING(32),
       },

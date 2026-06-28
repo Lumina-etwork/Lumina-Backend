@@ -77,29 +77,27 @@ class IdempotencyKeyService {
    */
   async createIdempotencyKey(key, webhookType, targetEndpoint, payload, expirationHours = null) {
     try {
+      const payloadHash = this.createPayloadHash(payload);
+
+      const existing = await IdempotencyKey.findOne({ where: { key } });
+      if (existing) {
+        if (existing.payload_hash !== payloadHash) {
+          throw new Error('Idempotency key exists but payload does not match');
+        }
+        return existing;
+      }
+
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + (expirationHours || this.defaultExpirationHours));
 
-      const payloadHash = this.createPayloadHash(payload);
-
-      const [record, created] = await IdempotencyKey.findOrCreate({
-        where: { key },
-        defaults: {
-          key,
-          webhook_type: webhookType,
-          target_endpoint: targetEndpoint,
-          payload_hash: payloadHash,
-          status: 'pending',
-          expires_at: expiresAt,
-        },
+      const record = await IdempotencyKey.create({
+        key,
+        webhook_type: webhookType,
+        target_endpoint: targetEndpoint,
+        payload_hash: payloadHash,
+        status: 'pending',
+        expires_at: expiresAt,
       });
-
-      if (!created) {
-        // If record already exists, verify payload matches
-        if (record.payload_hash !== payloadHash) {
-          throw new Error('Idempotency key exists but payload does not match');
-        }
-      }
 
       return record;
     } catch (error) {
@@ -226,6 +224,11 @@ class IdempotencyKeyService {
           'status',
           [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
         ],
+        where: {
+          expires_at: {
+            [Op.gt]: new Date(),
+          },
+        },
         group: ['status'],
         raw: true,
       });
@@ -245,7 +248,7 @@ class IdempotencyKeyService {
         byStatus: stats.reduce((acc, stat) => {
           acc[stat.status] = parseInt(stat.count);
           return acc;
-        }, {}),
+        }, { pending: 0, processing: 0, completed: 0, failed: 0 }),
       };
     } catch (error) {
       console.error('Error getting idempotency key statistics:', error);

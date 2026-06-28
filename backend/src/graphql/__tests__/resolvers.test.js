@@ -123,7 +123,7 @@ describe('GraphQL Resolvers', () => {
         });
 
         expect(models.Vault.findAll).toHaveBeenCalledWith({
-          where: { org_id: 'org123' },
+          where: { org_id: 'org123', is_blacklisted: false },
           include: [
             { model: models.Beneficiary, as: 'beneficiaries' },
             { model: models.SubSchedule, as: 'subSchedules' }

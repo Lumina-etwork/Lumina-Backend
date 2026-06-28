@@ -1,40 +1,47 @@
-const { Server } = require('socket.io');
 const { createServer } = require('http');
 const Client = require('socket.io-client');
 const DashboardGateway = require('../dashboard-gateway.gateway');
 
 describe('DashboardGateway', () => {
   let httpServer;
-  let io;
   let gateway;
   let clientSocket;
   let serverSocket;
 
   beforeAll((done) => {
     httpServer = createServer();
-    io = new Server(httpServer);
     gateway = new DashboardGateway(httpServer);
     
+    gateway.io.on('connection', (socket) => {
+      serverSocket = socket;
+    });
+
     httpServer.listen(() => {
       const port = httpServer.address().port;
       clientSocket = new Client(`http://localhost:${port}`);
-      io.on('connection', (socket) => {
-        serverSocket = socket;
-      });
       clientSocket.on('connect', done);
     });
   });
 
-  afterAll(() => {
-    io.close();
+  afterAll((done) => {
+    clientSocket.removeAllListeners();
     clientSocket.close();
-    httpServer.close();
+    gateway.destroy();
+    httpServer.close(done);
   });
 
   beforeEach(() => {
     // Clear any existing connections
     gateway.connectedUsers.clear();
     gateway.userSockets.clear();
+    // Reconnect socket if it was disconnected (e.g. by disconnection test)
+    if (!clientSocket.connected) {
+      clientSocket.connect();
+    }
+  });
+
+  afterEach(() => {
+    clientSocket.removeAllListeners();
   });
 
   describe('Authentication', () => {
@@ -196,15 +203,13 @@ describe('DashboardGateway', () => {
       
       clientSocket.on('subscribed', () => {
         expect(gateway.connectedUsers.has(testUserAddress)).toBe(true);
+        serverSocket.once('disconnect', () => {
+          expect(gateway.connectedUsers.has(testUserAddress)).toBe(false);
+          expect(gateway.userSockets.has(clientSocket.id)).toBe(false);
+          done();
+        });
         clientSocket.disconnect();
       });
-      
-      // Wait for disconnection to be processed
-      setTimeout(() => {
-        expect(gateway.connectedUsers.has(testUserAddress)).toBe(false);
-        expect(gateway.userSockets.has(clientSocket.id)).toBe(false);
-        done();
-      }, 100);
     });
 
     test('should provide connection statistics', () => {

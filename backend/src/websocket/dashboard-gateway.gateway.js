@@ -68,9 +68,10 @@ class DashboardGateway {
     });
 
     // Listen for claim events from indexing service
-    claimEventEmitter.on('claim', (claimData) => {
+    this._onClaimHandler = (claimData) => {
       this.onClaimEvent(claimData);
-    });
+    };
+    claimEventEmitter.on('claim', this._onClaimHandler);
 
     // Start periodic updates for live dashboard
     this.startPeriodicUpdates();
@@ -209,7 +210,7 @@ class DashboardGateway {
   }
 
   startPeriodicUpdates() {
-    setInterval(async () => {
+    this._updateInterval = setInterval(async () => {
       await this.broadcastLiveUpdates();
     }, this.updateIntervalMs);
   }
@@ -390,6 +391,16 @@ class DashboardGateway {
       connectedUsers: this.connectedUsers.size,
       users: Array.from(this.connectedUsers.keys())
     };
+  }
+
+  destroy() {
+    if (this._updateInterval) {
+      clearInterval(this._updateInterval);
+      this._updateInterval = null;
+    }
+    if (this._onClaimHandler) {
+      claimEventEmitter.removeListener('claim', this._onClaimHandler);
+    }
   }
 }
 

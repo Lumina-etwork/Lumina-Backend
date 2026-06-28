@@ -43,6 +43,7 @@ const ContractUpgradeSignature = require("./contractUpgradeSignature");
 const ContractUpgradeAuditLog = require("./contractUpgradeAuditLog");
 const VaultBalanceMonitorState = require("./vaultBalanceMonitorState");
 const TicketType = require("./TicketType");
+const Admin = require("./admin");
 const SorobanEvent = require("./sorobanEvent");
 const AdminAuditLog = require("./adminAuditLog");
 const GrantPriceSnapshot = require("./grantPriceSnapshot");
@@ -62,6 +63,7 @@ initOrganizationWebhookModel(sequelize);
 
 // Initialize TicketType model (it seems to be a function in this codebase)
 const TicketTypeModel = typeof TicketType === 'function' ? TicketType(sequelize) : TicketType;
+const AdminModel = typeof Admin === 'function' ? Admin(sequelize) : Admin;
 // Initialize factory function models (they export (sequelize) => model)
 const FutureLienModel = typeof FutureLien === 'function' ? FutureLien(sequelize) : FutureLien;
 const LienReleaseModel = typeof LienRelease === 'function' ? LienRelease(sequelize) : LienRelease;
@@ -116,6 +118,7 @@ const models = {
   LienMilestone: LienMilestoneModel,
   SorobanEvent,
   AdminAuditLog,
+  Admin: AdminModel,
   GrantPriceSnapshot,
   RoiCalculation,
   IdempotencyKey,

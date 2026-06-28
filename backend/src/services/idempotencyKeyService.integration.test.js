@@ -18,6 +18,7 @@ describe('IdempotencyKey Integration Tests', () => {
 
   beforeEach(async () => {
     // Clean up before each test
+    claimWebhookDispatcherService.stop();
     await IdempotencyKey.destroy({ where: {} });
     await OrganizationWebhook.destroy({ where: {} });
     await ClaimWebhookDelivery.destroy({ where: {} });
@@ -38,8 +39,8 @@ describe('IdempotencyKey Integration Tests', () => {
       };
 
       // Mock the webhook endpoint
-      const scope = nock(webhookUrl)
-        .post('/')
+      const scope = nock('https://example.com')
+        .post('/claim-webhook')
         .reply(200, { success: true });
 
       // Create organization webhook
@@ -83,10 +84,10 @@ describe('IdempotencyKey Integration Tests', () => {
       };
 
       // Mock the webhook endpoint to fail first, then succeed
-      const scope = nock(webhookUrl)
-        .post('/')
+      const scope = nock('https://example.com')
+        .post('/claim-webhook')
         .reply(500, { error: 'Internal server error' })
-        .post('/')
+        .post('/claim-webhook')
         .reply(200, { success: true });
 
       // Create organization webhook

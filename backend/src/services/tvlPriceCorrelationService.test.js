@@ -2,6 +2,15 @@ const tvlPriceCorrelationService = require('../services/tvlPriceCorrelationServi
 const request = require('supertest');
 const { HistoricalTVL, HistoricalTokenPrice } = require('../models');
 
+// Mock annualVestingStatementService so the Express app can load without env vars
+jest.mock('../services/annualVestingStatementService', () => ({
+  generateAnnualStatement: jest.fn(),
+  getStatement: jest.fn(),
+  getUserStatements: jest.fn(),
+  verifyStatementSignature: jest.fn(),
+  getStatementStats: jest.fn(),
+}));
+
 describe('TVL-Price Correlation Service', () => {
   beforeEach(() => {
     // Clear cache before each test
@@ -168,7 +177,30 @@ describe('Correlation API Endpoints', () => {
   let app;
   
   beforeAll(async () => {
+    // Mock DB calls so route handlers work without a real database
+    jest.spyOn(HistoricalTVL, 'findAll').mockResolvedValue(
+      Array.from({ length: 12 }, (_, i) => ({
+        snapshot_date: `2023-01-${String(i + 1).padStart(2, '0')}`,
+        total_value_locked: String(1000 + i * 100),
+        active_vaults_count: 5 + i,
+        tvl_change_24h: i > 0 ? `${i * 10}` : null,
+        tvl_change_percentage_24h: i > 0 ? `0.${i}` : null,
+        data_quality: 'high',
+      }))
+    );
+    jest.spyOn(HistoricalTokenPrice, 'findAll').mockResolvedValue(
+      Array.from({ length: 12 }, (_, i) => ({
+        price_date: `2023-01-${String(i + 1).padStart(2, '0')}`,
+        price_usd: String(10 + i),
+      }))
+    );
+
     app = require('../app').app;
+  });
+
+  afterAll(() => {
+    HistoricalTVL.findAll.mockRestore();
+    HistoricalTokenPrice.findAll.mockRestore();
   });
 
   describe('GET /api/correlation/analysis', () => {

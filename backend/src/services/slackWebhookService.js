@@ -3,8 +3,11 @@ const idempotencyKeyService = require('./idempotencyKeyService');
 
 class SlackWebhookService {
   constructor() {
-    this.webhookUrl = process.env.SLACK_WEBHOOK_URL;
     this.threshold = 10000; // $10,000 USD threshold
+  }
+
+  get webhookUrl() {
+    return process.env.SLACK_WEBHOOK_URL;
   }
 
   /**
@@ -174,7 +177,8 @@ class SlackWebhookService {
           }
 
           throw new Error(`Slack webhook failed with status ${response.status}`);
-        }
+        },
+        idempotencyKey
       );
 
       if (result.success) {

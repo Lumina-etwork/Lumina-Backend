@@ -19,6 +19,13 @@ describe('Vesting History API', () => {
   let testBeneficiary;
   let testClaims;
 
+  beforeEach(async () => {
+    const { get, set, deletePattern } = require('../services/cacheService');
+    get.mockReset();
+    set.mockReset();
+    deletePattern.mockReset();
+  });
+
   beforeAll(async () => {
     // Setup test app
     app = express();
@@ -221,7 +228,7 @@ describe('Vesting History API', () => {
     it('should return 404 for non-existent schedule', async () => {
       const response = await request(app)
         .get('/api/vesting-history/schedule/00000000-0000-0000-0000-000000000000')
-        .expect(200);
+        .expect(404);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBe('Vesting schedule not found');
@@ -362,8 +369,8 @@ describe('Vesting History API', () => {
 
     it('should handle database errors gracefully', async () => {
       // Mock a database error
-      const originalFindAll = SubSchedule.findAll;
-      SubSchedule.findAll = jest.fn().mockRejectedValue(new Error('Database error'));
+      const originalFindAndCountAll = SubSchedule.findAndCountAll;
+      SubSchedule.findAndCountAll = jest.fn().mockRejectedValue(new Error('Database error'));
 
       const response = await request(app)
         .get('/api/vesting-history/user/0x1234567890123456789012345678901234567890/history')
@@ -373,7 +380,7 @@ describe('Vesting History API', () => {
       expect(response.body.error).toBe('Failed to fetch vesting history');
 
       // Restore original method
-      SubSchedule.findAll = originalFindAll;
+      SubSchedule.findAndCountAll = originalFindAndCountAll;
     });
   });
 
@@ -399,7 +406,7 @@ describe('Vesting History API', () => {
 
       const startTime = Date.now();
       const response = await request(app)
-        .get('/api/vesting-history/user/0x1234567890123456789012345678901234567890/history')
+        .get('/api/vesting-history/user/0x1234567890123456789012345678901234567890/history?limit=100')
         .expect(200);
 
       const endTime = Date.now();

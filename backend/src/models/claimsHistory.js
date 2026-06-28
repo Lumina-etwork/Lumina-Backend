@@ -48,6 +48,11 @@ const ClaimsHistory = sequelize.define('ClaimsHistory', {
     allowNull: true,
     comment: 'Associated conversion event ID if claim was followed by immediate swap',
   },
+  vault_id: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    comment: 'Associated vault ID',
+  },
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
@@ -82,7 +87,7 @@ const ClaimsHistory = sequelize.define('ClaimsHistory', {
 ClaimsHistory.associate = function (models) {
   ClaimsHistory.belongsTo(models.Token, {
     foreignKey: 'token_address',
-    sourceKey: 'address',
+    targetKey: 'address',
     as: 'token'
   });
 
@@ -90,6 +95,12 @@ ClaimsHistory.associate = function (models) {
     foreignKey: 'conversion_event_id',
     sourceKey: 'id',
     as: 'conversionEvent'
+  });
+
+  ClaimsHistory.belongsTo(models.SubSchedule, {
+    foreignKey: 'vault_id',
+    targetKey: 'vault_id',
+    as: 'subSchedule'
   });
 };
 

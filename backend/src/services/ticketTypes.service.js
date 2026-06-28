@@ -8,6 +8,22 @@ const { sequelize } = require('../models');
  * to prevent overselling through database-level locking.
  */
 class TicketTypesService {
+  constructor() {
+    this._txLock = Promise.resolve();
+  }
+
+  async _serialized(fn) {
+    let release;
+    const prev = this._txLock;
+    this._txLock = new Promise(resolve => { release = resolve; });
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }
+
   /**
    * Reserve tickets atomically with database-level locking
    * 
@@ -37,9 +53,11 @@ class TicketTypesService {
     try {
       // Start transaction if not using provided query runner
       if (!useProvidedQueryRunner) {
-        await queryRunnerToUse.transaction(async (transaction) => {
-          return this._performReservation(ticketTypeId, quantity, queryRunnerToUse, transaction);
-        });
+        return await this._serialized(() =>
+          queryRunnerToUse.transaction(async (transaction) => {
+            return this._performReservation(ticketTypeId, quantity, queryRunnerToUse, transaction);
+          })
+        );
       } else {
         // Use the provided query runner (assumed to be in a transaction)
         return this._performReservation(ticketTypeId, quantity, queryRunnerToUse, queryRunnerToUse);
@@ -142,9 +160,11 @@ class TicketTypesService {
     try {
       // Start transaction if not using provided query runner
       if (!useProvidedQueryRunner) {
-        await queryRunnerToUse.transaction(async (transaction) => {
-          return this._performRelease(ticketTypeId, quantity, queryRunnerToUse, transaction);
-        });
+        return await this._serialized(() =>
+          queryRunnerToUse.transaction(async (transaction) => {
+            return this._performRelease(ticketTypeId, quantity, queryRunnerToUse, transaction);
+          })
+        );
       } else {
         // Use the provided query runner (assumed to be in a transaction)
         return this._performRelease(ticketTypeId, quantity, queryRunnerToUse, queryRunnerToUse);

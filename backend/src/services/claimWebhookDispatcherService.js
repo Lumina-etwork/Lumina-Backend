@@ -6,6 +6,7 @@ const {
   ClaimWebhookDelivery,
   Beneficiary,
   Vault,
+  IdempotencyKey,
 } = require('../models');
 const idempotencyKeyService = require('./idempotencyKeyService');
 
@@ -31,6 +32,7 @@ class ClaimWebhookDispatcherService {
     this.allowInsecureHttp = process.env.CLAIM_WEBHOOK_ALLOW_INSECURE_HTTP === 'true';
     this.processingDeliveries = new Set();
     this.resumeTimer = null;
+    this._pendingTimers = [];
   }
 
   async enqueueTokensClaimedEvent(claimEvent) {
@@ -68,12 +70,36 @@ class ClaimWebhookDispatcherService {
       const validation = this.validateEndpoint(webhook.webhook_url);
       const payloadSignature = this.signPayload(payload);
 
-      const [delivery, created] = await ClaimWebhookDelivery.findOrCreate({
+      let delivery = await ClaimWebhookDelivery.findOne({
         where: {
           organization_webhook_id: webhook.id,
           event_key: payload.event_id,
         },
-        defaults: {
+      });
+
+      if (delivery) {
+        if (delivery.delivery_status === 'success' || delivery.delivery_status === 'skipped') {
+          this.log('info', 'claim_webhook_duplicate_skipped', {
+            deliveryId: delivery.id,
+            eventId: payload.event_id,
+            status: delivery.delivery_status,
+          });
+          continue;
+        }
+        // Check idempotency key to avoid re-queueing failed/completed deliveries
+        const idempotencyRecord = await IdempotencyKey.findOne({
+          where: { key: payload.event_id, webhook_type: 'claim' },
+        });
+        if (idempotencyRecord && (idempotencyRecord.status === 'completed' || idempotencyRecord.status === 'failed' || idempotencyRecord.status === 'processing')) {
+          this.log('info', 'claim_webhook_duplicate_skipped', {
+            deliveryId: delivery.id,
+            eventId: payload.event_id,
+            status: idempotencyRecord.status,
+          });
+          continue;
+        }
+      } else {
+        delivery = await ClaimWebhookDelivery.create({
           organization_webhook_id: webhook.id,
           organization_id: webhook.organization_id,
           event_type: payload.event,
@@ -85,18 +111,7 @@ class ClaimWebhookDispatcherService {
           payload_signature: payloadSignature,
           delivery_status: validation.valid ? 'pending' : 'skipped',
           last_error_message: validation.valid ? null : validation.error,
-        },
-      });
-
-      if (!created) {
-        if (delivery.delivery_status === 'success' || delivery.delivery_status === 'skipped') {
-          this.log('info', 'claim_webhook_duplicate_skipped', {
-            deliveryId: delivery.id,
-            eventId: payload.event_id,
-            status: delivery.delivery_status,
-          });
-          continue;
-        }
+        });
       }
 
       if (!validation.valid) {
@@ -193,7 +208,8 @@ class ClaimWebhookDispatcherService {
             }
 
             throw this.buildHttpError(response.status, response.data);
-          }
+          },
+          idempotencyKey
         );
 
         if (result.success) {
@@ -276,6 +292,10 @@ class ClaimWebhookDispatcherService {
       clearInterval(this.resumeTimer);
       this.resumeTimer = null;
     }
+    for (const timer of this._pendingTimers) {
+      clearTimeout(timer);
+    }
+    this._pendingTimers = [];
   }
 
   async resumePendingDeliveries() {
@@ -306,7 +326,9 @@ class ClaimWebhookDispatcherService {
 
   scheduleDelivery(deliveryId, delayMs = 0) {
     const safeDelay = Math.max(0, Number(delayMs) || 0);
-    setTimeout(() => {
+    const timer = setTimeout(() => {
+      const idx = this._pendingTimers.indexOf(timer);
+      if (idx !== -1) this._pendingTimers.splice(idx, 1);
       this.processDelivery(deliveryId).catch((error) => {
         this.log('error', 'claim_webhook_process_uncaught', {
           deliveryId,
@@ -314,6 +336,7 @@ class ClaimWebhookDispatcherService {
         });
       });
     }, safeDelay);
+    this._pendingTimers.push(timer);
   }
 
   normalizePayload(claimEvent) {

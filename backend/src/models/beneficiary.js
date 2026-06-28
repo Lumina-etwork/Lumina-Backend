@@ -63,6 +63,22 @@ const Beneficiary = sequelize.define(
       defaultValue: 0,
       comment: "Total tokens withdrawn by this beneficiary",
     },
+    status: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "active",
+      comment: "Beneficiary status: active or revoked",
+    },
+    revoked_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: "When the beneficiary was revoked",
+    },
+    revocation_reason: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: "Reason for revocation",
+    },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

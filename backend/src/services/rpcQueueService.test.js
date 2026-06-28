@@ -171,12 +171,12 @@ describe('RpcQueueService', () => {
       const mockJob = { id: 'job-123' };
       mockQueueServiceInstance.addJob.mockResolvedValue(mockJob);
 
-      const job = await rpcQueueService.addRpcJob('getEvents', { startLedger: 100, endLedger: 200 });
+      const job = await rpcQueueService.addRpcJob('getEvents', { startLedger: 100, endLedger: 200 }, { rpcUrl: 'http://test-rpc-url' });
 
       expect(mockQueueServiceInstance.addJob).toHaveBeenCalledWith('rpc-fetch', 'getEvents', {
         method: 'getEvents',
         params: { startLedger: 100, endLedger: 200 },
-        rpcUrl: expect.any(String),
+        rpcUrl: 'http://test-rpc-url',
         timestamp: expect.any(Number),
         jobId: expect.any(String),
         metadata: {

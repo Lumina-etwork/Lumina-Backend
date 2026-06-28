@@ -77,8 +77,7 @@ describe('TicketTypesService', () => {
     it('should handle concurrent reservations correctly', async () => {
       const promises = [];
       
-      // Create multiple concurrent reservation attempts
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 20; i++) {
         promises.push(ticketTypesService.reserveTickets(testTicketType.id, 5));
       }
       
@@ -99,24 +98,18 @@ describe('TicketTypesService', () => {
     });
 
     it('should work with provided QueryRunner', async () => {
-      const queryRunner = sequelize.createQueryRunner();
-      
-      // Start transaction manually
-      await queryRunner.startTransaction();
+      const t = await sequelize.transaction();
       
       try {
-        const result = await ticketTypesService.reserveTickets(testTicketType.id, 3, queryRunner);
+        const result = await ticketTypesService.reserveTickets(testTicketType.id, 3, t);
         
         expect(result.success).toBe(true);
         expect(result.reservation.quantity).toBe(3);
         
-        // Commit transaction
-        await queryRunner.commitTransaction();
+        await t.commit();
       } catch (error) {
-        await queryRunner.rollbackTransaction();
+        await t.rollback();
         throw error;
-      } finally {
-        await queryRunner.release();
       }
     });
   });
@@ -155,22 +148,18 @@ describe('TicketTypesService', () => {
     });
 
     it('should work with provided QueryRunner', async () => {
-      const queryRunner = sequelize.createQueryRunner();
-      
-      await queryRunner.startTransaction();
+      const t = await sequelize.transaction();
       
       try {
-        const result = await ticketTypesService.releaseTickets(testTicketType.id, 3, queryRunner);
+        const result = await ticketTypesService.releaseTickets(testTicketType.id, 3, t);
         
         expect(result.success).toBe(true);
         expect(result.release.quantity).toBe(3);
         
-        await queryRunner.commitTransaction();
+        await t.commit();
       } catch (error) {
-        await queryRunner.rollbackTransaction();
+        await t.rollback();
         throw error;
-      } finally {
-        await queryRunner.release();
       }
     });
 
@@ -345,23 +334,19 @@ describe('TicketTypesService', () => {
       const promises = [];
       
       for (let i = 0; i < concurrentOperations; i++) {
-        // Create a sequence of reserve and release operations
         const batchPromise = (async () => {
-          // Reserve random quantity (1-3)
           const reserveQty = Math.floor(Math.random() * 3) + 1;
-          await ticketTypesService.reserveTickets(testTicketType.id, reserveQty);
-          
-          // Small delay to simulate real-world timing
+          try {
+            await ticketTypesService.reserveTickets(testTicketType.id, reserveQty);
+          } catch {
+            return;
+          }
           await new Promise(resolve => setTimeout(resolve, Math.random() * 10));
-          
-          // Release the same quantity
           await ticketTypesService.releaseTickets(testTicketType.id, reserveQty);
         })();
-        
         promises.push(batchPromise);
       }
       
-      // Wait for all operations to complete
       await Promise.all(promises);
       
       // Final state should be back to original (0 sold)

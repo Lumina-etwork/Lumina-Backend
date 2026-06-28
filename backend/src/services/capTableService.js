@@ -45,7 +45,9 @@ class CapTableService {
     const vaults = await this.getTokenVaults(tokenAddress, organizationId, includeInactive);
     
     if (vaults.length === 0) {
-      return this.createEmptyCapTable(tokenAddress);
+      const empty = this.createEmptyCapTable(tokenAddress);
+      empty.tokenInfo = await this.getTokenInfo(tokenAddress);
+      return empty;
     }
 
     // Get all beneficiaries and their schedules

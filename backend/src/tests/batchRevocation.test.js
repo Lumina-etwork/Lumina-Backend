@@ -12,6 +12,8 @@ describe('Batch Revocation Service', () => {
   const treasuryAddress = 'TREASURYADDRESS123456789';
 
   beforeAll(async () => {
+    await sequelize.sync({ force: true });
+
     // Create test vault
     vault = await Vault.create({
       address: 'TESTVAULTBATCHREVOK123456',
@@ -47,6 +49,7 @@ describe('Batch Revocation Service', () => {
       vesting_duration: 86400000 * 365, // 1 year
       start_timestamp: new Date(Date.now() - 86400000 * 30),
       end_timestamp: new Date(Date.now() + 86400000 * 335),
+      transaction_hash: 'txhash_batch_revocation_test',
       is_active: true,
     });
   });
@@ -159,7 +162,17 @@ describe('Batch Revocation Service', () => {
     });
 
     it('should rollback on error (atomic behavior)', async () => {
-      const validAddresses = beneficiaries.map(b => b.address);
+      const rollbackBeneficiaries = await Promise.all(
+        beneficiaries.map((b, i) =>
+          Beneficiary.create({
+            vault_id: vault.id,
+            address: `ROLLBACK_BENEFICIARY_${i}`,
+            total_allocated: b.total_allocated,
+            total_withdrawn: '0',
+          })
+        )
+      );
+      const validAddresses = rollbackBeneficiaries.map(b => b.address);
       const invalidAddresses = [...validAddresses, 'INVALIDBENEFICIARY12345'];
 
       try {

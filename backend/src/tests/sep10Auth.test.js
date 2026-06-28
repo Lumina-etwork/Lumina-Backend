@@ -60,7 +60,7 @@ describe('SEP-10 Authentication Middleware', () => {
       const middleware = sep10Auth;
       
       // Test valid Stellar public key
-      expect(middleware.isValidStellarPublicKey('GABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz234567')).toBe(true);
+      expect(middleware.isValidStellarPublicKey('GABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz234')).toBe(true);
       
       // Test invalid Stellar public keys
       expect(middleware.isValidStellarPublicKey('invalid')).toBe(false);
@@ -74,7 +74,7 @@ describe('SEP-10 Authentication Middleware', () => {
       // Test valid claims
       const validClaims = {
         iss: 'https://anchor.example.com',
-        sub: 'GABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz234567',
+        sub: 'GABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz234',
         exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
         iat: Math.floor(Date.now() / 1000) // now
       };
@@ -85,7 +85,7 @@ describe('SEP-10 Authentication Middleware', () => {
       expect(result.stellarPublicKey).toBe(validClaims.sub);
       
       // Test missing claims
-      const missingClaims = { sub: 'GABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz234567' };
+      const missingClaims = { sub: 'GABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz234' };
       const missingResult = middleware.validateSEP10Claims(missingClaims);
       expect(missingResult.isValid).toBe(false);
       expect(missingResult.errors.length).toBeGreaterThan(0);
@@ -104,7 +104,7 @@ describe('SEP-10 Authentication Middleware', () => {
       // Test expired token
       const expiredClaims = {
         iss: 'https://anchor.example.com',
-        sub: 'GABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz234567',
+        sub: 'GABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz234',
         exp: Math.floor(Date.now() / 1000) - 3600, // 1 hour ago
         iat: Math.floor(Date.now() / 1000) - 7200 // 2 hours ago
       };
@@ -115,7 +115,7 @@ describe('SEP-10 Authentication Middleware', () => {
 
     it('should check user authorization correctly', () => {
       const middleware = sep10Auth;
-      const userPublicKey = 'GABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz234567';
+      const userPublicKey = 'GABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz234';
       
       // Test authorized access (same user)
       const authorizedReq = {

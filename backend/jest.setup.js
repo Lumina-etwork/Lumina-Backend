@@ -1,5 +1,11 @@
 // jest.setup.js
 require('dotenv').config({ path: '.env.test' });
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key';
+process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-jwt-refresh-secret-key';
+process.env.TRANSPARENCY_PRIVATE_KEY = process.env.TRANSPARENCY_PRIVATE_KEY || 'test-transparency-private-key';
+process.env.TRANSPARENCY_PUBLIC_KEY = process.env.TRANSPARENCY_PUBLIC_KEY || 'test-transparency-public-key';
+process.env.NODE_ENV = 'test';
+process.env.STELLAR_SERVER_PUBLIC_KEY = process.env.STELLAR_SERVER_PUBLIC_KEY || 'test-stellar-server-public-key';
 
 jest.setTimeout(60000);
 

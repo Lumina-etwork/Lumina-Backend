@@ -145,7 +145,6 @@ class SEP10AuthMiddleware {
    */
   authenticate(options = {}) {
     const {
-      serverPublicKey = process.env.STELLAR_SERVER_PUBLIC_KEY,
       requireUserMatch = true, // Whether to enforce user can only access own data
     } = options;
 
@@ -162,7 +161,9 @@ class SEP10AuthMiddleware {
           });
         }
 
-        // Verify server public key is available
+        // Verify server public key is available (read at request time)
+        const serverPublicKey =
+          options.serverPublicKey || process.env.STELLAR_SERVER_PUBLIC_KEY;
         if (!serverPublicKey) {
           return res.status(500).json({
             success: false,

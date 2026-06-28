@@ -9,7 +9,7 @@ const {
   Token,
   VestingMilestone
 } = require('../models');
-const { Op } = require('sequelize');
+const { Op, where: seqWhere, literal } = require('sequelize');
 const cacheService = require('../services/cacheService');
 
 /**
@@ -18,10 +18,15 @@ const cacheService = require('../services/cacheService');
 router.get('/user/:userAddress/history', async (req, res) => {
   try {
     const { userAddress } = req.params;
+
+    if (!/^0x[a-fA-F0-9]{40}$/.test(userAddress)) {
+      return res.status(500).json({ success: false, error: 'Invalid beneficiary address' });
+    }
+
     const {
       page = 1,
       limit = 50,
-      sortBy = 'updatedAt',
+      sortBy = 'updated_at',
       sortOrder = 'desc',
       status,
       dateFrom,
@@ -47,9 +52,18 @@ router.get('/user/:userAddress/history', async (req, res) => {
     }
 
     // Build where clause
-    const whereClause = {
-      '$vault.beneficiaries.address$': userAddress
-    };
+    const beneficiaries = await Beneficiary.findAll({
+      where: { address: userAddress },
+      attributes: ['vault_id'],
+      raw: true
+    });
+    const vaultIds = beneficiaries.map(b => b.vault_id);
+    const whereClause = {};
+    if (vaultIds.length > 0) {
+      whereClause.vault_id = { [Op.in]: vaultIds };
+    } else {
+      whereClause.vault_id = null;
+    }
 
     // Add status filter
     if (status) {
@@ -72,7 +86,7 @@ router.get('/user/:userAddress/history', async (req, res) => {
       const dateFilter = {};
       if (dateFrom) dateFilter[Op.gte] = new Date(dateFrom);
       if (dateTo) dateFilter[Op.lte] = new Date(dateTo);
-      whereClause.createdAt = dateFilter;
+      whereClause.created_at = dateFilter;
     }
 
     // Execute optimized query
@@ -141,8 +155,8 @@ router.get('/user/:userAddress/history', async (req, res) => {
         beneficiaryAddress: userAddress,
         
         // Financial data
-        totalAllocated: schedule.top_up_amount,
-        totalWithdrawn: schedule.amount_withdrawn,
+        totalAllocated: String(schedule.top_up_amount),
+        totalWithdrawn: String(schedule.amount_withdrawn),
         remainingAmount: (parseFloat(schedule.top_up_amount) - parseFloat(schedule.amount_withdrawn)).toString(),
         vestedAmount,
         withdrawableAmount,
@@ -217,6 +231,10 @@ router.get('/user/:userAddress/summary', async (req, res) => {
   try {
     const { userAddress } = req.params;
     
+    if (!/^0x[a-fA-F0-9]{40}$/.test(userAddress)) {
+      return res.status(500).json({ success: false, error: 'Invalid beneficiary address' });
+    }
+
     // Build cache key
     const cacheKey = `vesting_summary_${userAddress}`;
     
@@ -231,10 +249,21 @@ router.get('/user/:userAddress/summary', async (req, res) => {
     }
 
     // Get all schedules for the user
+    const beneficiaries = await Beneficiary.findAll({
+      where: { address: userAddress },
+      attributes: ['vault_id'],
+      raw: true
+    });
+    const vaultIds = beneficiaries.map(b => b.vault_id);
+    const summaryWhere = {};
+    if (vaultIds.length > 0) {
+      summaryWhere.vault_id = { [Op.in]: vaultIds };
+    } else {
+      summaryWhere.vault_id = null;
+    }
+
     const schedules = await SubSchedule.findAll({
-      where: {
-        '$vault.beneficiaries.address$': userAddress
-      },
+      where: summaryWhere,
       include: [
         {
           model: Vault,
@@ -487,8 +516,8 @@ router.get('/schedule/:scheduleId', async (req, res) => {
       beneficiaryAddress: schedule.vault?.beneficiaries?.[0]?.address || null,
       
       // Financial data
-      totalAllocated: schedule.top_up_amount,
-      totalWithdrawn: schedule.amount_withdrawn,
+      totalAllocated: String(schedule.top_up_amount),
+      totalWithdrawn: String(schedule.amount_withdrawn),
       remainingAmount: (parseFloat(schedule.top_up_amount) - parseFloat(schedule.amount_withdrawn)).toString(),
       vestedAmount,
       withdrawableAmount,
@@ -561,6 +590,11 @@ router.get('/schedule/:scheduleId', async (req, res) => {
 router.get('/user/:userAddress/claims', async (req, res) => {
   try {
     const { userAddress } = req.params;
+    
+    if (!/^0x[a-fA-F0-9]{40}$/.test(userAddress)) {
+      return res.status(500).json({ success: false, error: 'Invalid beneficiary address' });
+    }
+
     const {
       page = 1,
       limit = 50,
@@ -579,18 +613,10 @@ router.get('/user/:userAddress/claims', async (req, res) => {
     const whereClause = { user_address: userAddress };
     
     if (vaultId) {
-      whereClause[Op.and] = [
-        sequelize.where(
-          sequelize.literal(`EXISTS (
-            SELECT 1 FROM sub_schedules ss 
-            JOIN vaults v ON ss.vault_id = v.id 
-            JOIN beneficiaries b ON v.id = b.vault_id 
-            WHERE ss.id = claims_history.vault_id AND b.address = :userAddress
-            AND ss.id = :vaultId
-          )`),
-          { userAddress, vaultId }
-        )
-      ];
+      const schedule = await SubSchedule.findByPk(vaultId, { attributes: ['vault_id'] });
+      if (schedule) {
+        whereClause.vault_id = schedule.vault_id;
+      }
     }
 
     // Add date range filter
@@ -691,15 +717,25 @@ router.get('/statistics', async (req, res) => {
 
     const whereClause = {};
     
+    if (organizationId) {
+      const vaults = await Vault.findAll({
+        where: { org_id: organizationId },
+        attributes: ['id'],
+        raw: true
+      });
+      const vaultIds = vaults.map(v => v.id);
+      if (vaultIds.length > 0) {
+        whereClause.vault_id = { [Op.in]: vaultIds };
+      } else {
+        whereClause.vault_id = null;
+      }
+    }
+
     if (dateFrom || dateTo) {
       const dateFilter = {};
       if (dateFrom) dateFilter[Op.gte] = new Date(dateFrom);
       if (dateTo) dateFilter[Op.lte] = new Date(dateTo);
-      whereClause.createdAt = dateFilter;
-    }
-
-    if (organizationId) {
-      whereClause['$vault.organization_id$'] = organizationId;
+      whereClause.created_at = dateFilter;
     }
 
     const now = new Date();
@@ -724,10 +760,12 @@ router.get('/statistics', async (req, res) => {
       })
     ]);
 
-    const [totalAllocated, totalWithdrawn] = await Promise.all([
-      SubSchedule.sum('top_up_amount', { where: whereClause }) || 0,
-      SubSchedule.sum('amount_withdrawn', { where: whereClause }) || 0
+    const [totalAllocatedRaw, totalWithdrawnRaw] = await Promise.all([
+      SubSchedule.sum('top_up_amount', { where: whereClause }),
+      SubSchedule.sum('amount_withdrawn', { where: whereClause })
     ]);
+    const totalAllocated = totalAllocatedRaw || 0;
+    const totalWithdrawn = totalWithdrawnRaw || 0;
 
     const [claims24h, claims7d, claims30d] = await Promise.all([
       ClaimsHistory.count({

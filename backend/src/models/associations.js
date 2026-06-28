@@ -6,6 +6,7 @@ module.exports = function(models) {
     Vault.hasMany(models.SubSchedule, { foreignKey: 'vault_id', as: 'subSchedules' });
     Vault.hasMany(models.Beneficiary, { foreignKey: 'vault_id', as: 'beneficiaries' });
     Vault.belongsTo(models.Organization, { foreignKey: 'org_id', as: 'organization' });
+    Vault.belongsTo(models.Token, { foreignKey: 'token_address', targetKey: 'address', as: 'token' });
   };
 
   Organization.associate = function(models) {
@@ -15,6 +16,8 @@ module.exports = function(models) {
 
   SubSchedule.associate = function(models) {
     SubSchedule.belongsTo(models.Vault, { foreignKey: 'vault_id', as: 'vault' });
+    SubSchedule.hasMany(models.ClaimsHistory, { foreignKey: 'vault_id', sourceKey: 'vault_id', as: 'claims' });
+    SubSchedule.hasMany(models.VestingMilestone, { foreignKey: 'vault_id', sourceKey: 'vault_id', as: 'milestones' });
   };
 
   Beneficiary.associate = function(models) {

@@ -1,5 +1,15 @@
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
+
+// Mock annualVestingStatementService so the Express app can load without env vars
+jest.mock('../services/annualVestingStatementService', () => ({
+  generateAnnualStatement: jest.fn(),
+  getStatement: jest.fn(),
+  getUserStatements: jest.fn(),
+  verifyStatementSignature: jest.fn(),
+  getStatementStats: jest.fn(),
+}));
+
 const { app } = require('../app');
 const { sequelize } = require('../database/connection');
 const { VaultRegistry } = require('../models');

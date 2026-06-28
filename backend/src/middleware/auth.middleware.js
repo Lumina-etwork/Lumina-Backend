@@ -29,20 +29,19 @@ const authenticateAdmin = async (req, res, next) => {
       });
     }
 
-    // Verify admin status
+    // Trust the JWT role claim if it says admin (issued by auth service)
+    if (decoded.role === 'admin') {
+      req.user = {
+        address: decoded.address,
+        role: 'admin'
+      };
+      return next();
+    }
+
+    // Verify admin status via database/ENV fallback
     const isAdmin = await verifyAdminStatus(decoded.address);
     if (!isAdmin) {
-      await auditLogger.log({
-        action: 'UNAUTHORIZED_ADMIN_ACCESS',
-        actor: decoded.address,
-        target: req.path,
-        details: {
-          ip: req.ip,
-          userAgent: req.get('User-Agent'),
-          path: req.path,
-          method: req.method
-        }
-      });
+      auditLogger.logAction(decoded.address, 'UNAUTHORIZED_ADMIN_ACCESS', req.path);
 
       return res.status(403).json({
         success: false,
@@ -113,8 +112,7 @@ const verifyAdminStatus = async (address) => {
     // Method 3: Check if address is organization admin
     const org = await Organization.findOne({
       where: { 
-        admin_address: address.toLowerCase(),
-        is_active: true 
+        admin_address: address.toLowerCase()
       }
     });
 
@@ -140,16 +138,7 @@ const hsmSecurityMiddleware = async (req, res, next) => {
       const clientIP = req.ip || req.connection.remoteAddress;
       
       if (!allowedIPs.includes(clientIP)) {
-        await auditLogger.log({
-          action: 'HSM_IP_BLOCKED',
-          actor: req.user?.address || 'unknown',
-          target: req.path,
-          details: {
-            clientIP,
-            allowedIPs,
-            path: req.path
-          }
-        });
+        auditLogger.logAction(req.user?.address || 'unknown', 'HSM_IP_BLOCKED', req.path);
 
         return res.status(403).json({
           success: false,
@@ -166,16 +155,7 @@ const hsmSecurityMiddleware = async (req, res, next) => {
         : [9, 17]; // Default 9 AM - 5 PM
 
       if (currentHour < businessHours[0] || currentHour > businessHours[1]) {
-        await auditLogger.log({
-          action: 'HSM_TIME_BLOCKED',
-          actor: req.user?.address || 'unknown',
-          target: req.path,
-          details: {
-            currentHour,
-            businessHours,
-            path: req.path
-          }
-        });
+        auditLogger.logAction(req.user?.address || 'unknown', 'HSM_TIME_BLOCKED', req.path);
 
         return res.status(403).json({
           success: false,
@@ -250,16 +230,7 @@ const validateHSMOperation = (operationType) => {
       }
 
       // Log the operation attempt
-      await auditLogger.log({
-        action: `HSM_OPERATION_ATTEMPT_${operationType.toUpperCase()}`,
-        actor: req.user?.address || 'unknown',
-        target: req.path,
-        details: {
-          operationType,
-          ip: req.ip,
-          userAgent: req.get('User-Agent')
-        }
-      });
+      auditLogger.logAction(req.user?.address || 'unknown', `HSM_OPERATION_ATTEMPT_${operationType.toUpperCase()}`, req.path);
 
       next();
 

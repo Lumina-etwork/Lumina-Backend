@@ -4,8 +4,8 @@ const { Vault, SubSchedule, Beneficiary, Organization, Token } = require('../../
 describe('CapTableService', () => {
   describe('generateCapTable', () => {
     it('should generate an empty cap table for token with no vaults', async () => {
-      // Mock the database calls
       jest.spyOn(Vault, 'findAll').mockResolvedValue([]);
+      jest.spyOn(Token, 'findOne').mockResolvedValue(null);
       
       const result = await capTableService.generateCapTable('0x1234567890123456789012345678901234567890');
       
@@ -67,7 +67,7 @@ describe('CapTableService', () => {
 
     it('should calculate Gini coefficient correctly', () => {
       const result = capTableService.calculateGiniCoefficient([0, 50, 100]);
-      expect(result).toBeCloseTo(0.33, 2);
+      expect(result).toBeCloseTo(4 / 9, 2);
     });
   });
 

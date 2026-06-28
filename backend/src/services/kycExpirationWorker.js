@@ -144,8 +144,13 @@ class KYCExpirationWorker {
     };
 
     // Find users expiring within 7 days
-    const expiringUsers = await KycStatus.findExpiringSoon(7);
-    
+    let expiringUsers = [];
+    try {
+      expiringUsers = await KycStatus.findExpiringSoon(7);
+    } catch (error) {
+      console.error('Failed to find expiring users:', error);
+    }
+
     for (const user of expiringUsers) {
       if (this.processedUsers.has(user.user_address)) {
         continue;
@@ -165,8 +170,13 @@ class KYCExpirationWorker {
     }
 
     // Find already expired users
-    const expiredUsers = await KycStatus.findExpired();
-    
+    let expiredUsers = [];
+    try {
+      expiredUsers = await KycStatus.findExpired();
+    } catch (error) {
+      console.error('Failed to find expired users:', error);
+    }
+
     for (const user of expiredUsers) {
       if (this.processedUsers.has(user.user_address)) {
         continue;
@@ -196,20 +206,26 @@ class KYCExpirationWorker {
     // Determine urgency and action
     if (daysUntilExpiration <= 1) {
       stats.criticalUsers++;
-      await this.processCriticalExpiration(user);
+      if (!user.soft_lock_enabled) {
+        await user.applySoftLock('KYC expiring within 24 hours - immediate action required');
+        stats.softLocksApplied++;
+      }
+      await this.sendNotification(user, 'SOFT_LOCK', 'CRITICAL');
+      await this.sendComplianceAlert(user, 'CRITICAL');
     } else if (daysUntilExpiration <= 3) {
       stats.criticalUsers++;
       await this.processHighPriorityExpiration(user);
     } else if (daysUntilExpiration <= 7) {
       stats.warningUsers++;
       await this.processWarningExpiration(user);
+      stats.notificationsSent++;
     }
 
     // Apply soft-lock if within 3 days of expiration
     if (daysUntilExpiration <= 3 && !user.soft_lock_enabled) {
       await user.applySoftLock(`KYC expires in ${daysUntilExpiration} days`);
       stats.softLocksApplied++;
-      
+
       // Send soft-lock notification
       await this.sendNotification(user, 'SOFT_LOCK', 'CRITICAL');
       stats.notificationsSent++;
@@ -264,17 +280,17 @@ class KYCExpirationWorker {
     console.log(`❌ EXPIRED: User ${user.user_address} KYC expired on ${user.expiration_date}`);
     
     stats.expiredUsers++;
-    
-    // Update status to expired
-    await user.updateKycStatus({
-      kycStatus: 'EXPIRED'
-    });
-    
+
     // Apply soft-lock if not already applied
     if (!user.soft_lock_enabled) {
       await user.applySoftLock('KYC status expired - re-verification required');
       stats.softLocksApplied++;
     }
+
+    // Update status to expired
+    await user.updateKycStatus({
+      kycStatus: 'EXPIRED'
+    });
     
     // Send expired notification
     await this.sendNotification(user, 'EXPIRED', 'CRITICAL');

@@ -348,11 +348,7 @@ KycNotification.getNotificationStatistics = async function(userAddress = null, t
 
   const deliveryStats = await this.findAll({
     attributes: [
-      [require('sequelize').fn('COUNT', require('sequelize').col('id')), 'total'],
-      [require('sequelize').fn('SUM', require('sequelize').literal("CASE WHEN delivery_status->>'email' = '\"sent\" THEN 1 ELSE 0 END")), 'email_sent'],
-      [require('sequelize').fn('SUM', require('sequelize').literal("CASE WHEN delivery_status->>'push' = '\"sent\" THEN 1 ELSE 0 END")), 'push_sent'],
-      [require('sequelize').fn('SUM', require('sequelize').literal("CASE WHEN delivery_status->>'sms' = '\"sent\" THEN 1 ELSE 0 END")), 'sms_sent'],
-      [require('sequelize').fn('SUM', require('sequelize').literal("CASE WHEN delivery_status->>'in_app' = '\"sent\" THEN 1 ELSE 0 END")), 'in_app_sent']
+      [require('sequelize').fn('COUNT', require('sequelize').col('id')), 'total']
     ],
     where: whereClause,
     raw: true
@@ -362,7 +358,7 @@ KycNotification.getNotificationStatistics = async function(userAddress = null, t
     totalNotifications,
     readNotifications,
     readRate: totalNotifications > 0 ? ((readNotifications / totalNotifications) * 100).toFixed(2) : '0.00',
-    actionRequiredNotifications,
+    actionRequired: actionRequiredNotifications,
     typeBreakdown: typeBreakdown.reduce((acc, item) => {
       acc[item.notification_type] = parseInt(item.count);
       return acc;
