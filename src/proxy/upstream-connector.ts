@@ -6,11 +6,9 @@ export class UpstreamConnector {
         
         socket.connect({ host, port }, () => {
             if (!isKeepAlive) {
-                // Set SO_LINGER with timeout 0 on sockets where feasible 
-                // to skip TIME_WAIT entirely for non-keepalive connections.
-                // In Node.js, calling socket.destroy() achieves a similar RST behavior.
-                socket.on('end', () => {
-                    socket.destroy();
+                socket.setNoDelay(true);
+                socket.once('end', () => {
+                    socket.destroy(new Error('eager-close'));
                 });
             }
         });

@@ -132,6 +132,14 @@ export class CircuitBreakerStateMachine {
     const prev = this.state
     this.state = newState
     this.options.onStateChange(this.options.upstreamUrl, prev, newState)
+    if (typeof process !== 'undefined' && process.emit) {
+      process.emit('metric', 'circuit_breaker_state_change', {
+        upstream: this.options.upstreamUrl,
+        from: prev,
+        to: newState,
+        timestamp: Date.now(),
+      })
+    }
   }
 
   private checkTransitions(): void {

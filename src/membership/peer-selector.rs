@@ -1,8 +1,21 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
+use std::sync::Mutex;
 
 pub const DEFAULT_GOSSIP_FANOUT: usize = 3;
 const REJECTION_ROUNDS: usize = 3;
+
+static SHUFFLE_CACHE: Mutex<Option<HashMap<(Vec<u8>, u64), Vec<String>>>> = Mutex::new(None);
+
+fn get_shuffle_cache() -> std::sync::MutexGuard<'static, Option<HashMap<(Vec<u8>, u64), Vec<String>>>> {
+    SHUFFLE_CACHE.lock().unwrap()
+}
+
+pub fn clear_shuffle_cache() {
+    if let Ok(mut cache) = SHUFFLE_CACHE.lock() {
+        cache.as_mut().map(|c| c.clear());
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Peer {
@@ -11,10 +24,34 @@ pub struct Peer {
 }
 
 pub fn select_peers(members: &[Peer], fanout: usize, seed: &[u8]) -> Vec<Peer> {
+    let members_hash = {
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        for p in members {
+            p.id.hash(&mut h);
+        }
+        h.finish()
+    };
+    let key = (seed.to_vec(), members_hash);
+    {
+        let cache = get_shuffle_cache();
+        if let Some(ref c) = *cache {
+            if let Some(cached) = c.get(&key) {
+                let selected: Vec<Peer> = cached.iter().filter_map(|id| members.iter().find(|p| &p.id == id)).cloned().collect();
+                if selected.len() >= fanout.min(members.len()) {
+                    return selected;
+                }
+            }
+        }
+    }
     let mut shuffled = fisher_yates_shuffle(members, seed);
     let take = fanout.min(shuffled.len());
     let mut selected: Vec<Peer> = shuffled.drain(..take).collect();
     diversify_prefixes(&mut selected, shuffled, take);
+    let selected_ids: Vec<String> = selected.iter().map(|p| p.id.clone()).collect();
+    {
+        let mut cache = get_shuffle_cache();
+        cache.get_or_insert_with(HashMap::new).insert(key, selected_ids);
+    }
     selected
 }
 

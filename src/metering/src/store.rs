@@ -19,8 +19,9 @@ impl ShardedCounterStore {
             let shard = MmapShard::new(FLOWS_PER_SHARD);
             shard.mlock_region(SHARD_BYTES);
             shard.prefault(SHARD_BYTES);
+            let locked = shard.is_locked();
             *slot = std::mem::MaybeUninit::new(shard);
-            log_shard_init(i, SHARD_BYTES, shard.is_locked());
+            log_shard_init(i, SHARD_BYTES, locked);
         }
 
         Self {

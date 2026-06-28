@@ -59,6 +59,7 @@ export class FlowTracker {
 }
 
 export const globalFlowTracker = new FlowTracker();
+
 const MAX_FLOWS = 500_000;
 const FLOW_TTL_MS = 300_000;
 const CLEANUP_INTERVAL_MS = 15_000;
@@ -75,7 +76,7 @@ interface FlowTable {
   [flowId: number]: FlowEntry;
 }
 
-export class FlowTracker {
+export class LegacyFlowTracker {
   private flows: FlowTable = Object.create(null);
   private maxFlows: number = MAX_FLOWS;
   private cleanupTimer: any = null;

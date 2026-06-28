@@ -48,10 +48,21 @@ export class GossipProtocol {
   private memberList: MemberList;
   private nodeId: string;
   public sentMessages: { address: string; msg: any }[] = [];
+  private roundOffset: number;
 
   constructor(nodeId: string, memberList: MemberList) {
     this.nodeId = nodeId;
     this.memberList = memberList;
+    this.roundOffset = this.computeRoundOffset(nodeId);
+  }
+
+  private computeRoundOffset(nodeId: string): number {
+    let hash = 0;
+    for (let i = 0; i < nodeId.length; i++) {
+      hash = ((hash << 5) - hash) + nodeId.charCodeAt(i);
+      hash |= 0;
+    }
+    return (Math.abs(hash) % 5) * 20;
   }
 
   disseminateUpdate(member: Member): void {

@@ -75,6 +75,9 @@ impl MmapShard {
             } else {
                 self.locked.store(true, Ordering::Release);
             }
+            unsafe {
+                libc::mlockall(libc::MCL_CURRENT | libc::MCL_FUTURE);
+            }
         }
 
         #[cfg(not(target_os = "linux"))]

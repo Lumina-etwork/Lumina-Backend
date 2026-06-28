@@ -1,3 +1,8 @@
+function ipToInt(ip: string): number {
+  const parts = ip.split('.');
+  return ((+parts[0] << 24) | (+parts[1] << 16) | (+parts[2] << 8) | +parts[3]) >>> 0;
+}
+
 export interface FlowTuple {
   srcIp: string;
   dstIp: string;
@@ -21,7 +26,7 @@ export interface CanonicalFlowTuple {
  * This ensures ingress and egress produce identical hash keys.
  */
 export function normalizeFlow(flow: FlowTuple): CanonicalFlowTuple {
-  const isSwapped = flow.srcIp > flow.dstIp;
+  const isSwapped = ipToInt(flow.srcIp) > ipToInt(flow.dstIp);
 
   return {
     srcTupleA: isSwapped ? flow.dstIp : flow.srcIp,

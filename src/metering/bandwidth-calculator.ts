@@ -1,14 +1,5 @@
 import { FlowTuple, normalizeFlow } from './flow-normalizer';
-import { globalFlowTracker } from './flow-tracker';
-
-export class BandwidthCalculator {
-  /**
-   * Normalizes the packet flow and dispatches the counter update to the appropriate NIC shard.
-   */
-  public static dispatchCounterUpdate(nicId: number, flow: FlowTuple, bytes: bigint) {
-    const canonical = normalizeFlow(flow);
-    globalFlowTracker.recordTraffic(nicId, canonical, bytes);
-import { FlowTracker } from './flow-tracker';
+import { LegacyFlowTracker, globalFlowTracker } from './flow-tracker';
 
 const FLUSH_INTERVAL_MS = 1;
 const BATCH_THRESHOLD = 1000;
@@ -34,7 +25,7 @@ export class BandwidthCalculator {
 
   constructor(
     private readonly store: { increment(flowId: number, ingressBytes: number, egressBytes: number): void },
-    private readonly tracker: FlowTracker,
+    private readonly tracker: LegacyFlowTracker,
   ) {
     const t: Timer = setInterval(() => this.flush(), FLUSH_INTERVAL_MS);
     (t as any).unref?.();
@@ -69,4 +60,9 @@ export class BandwidthCalculator {
     }
     this.batch.length = 0;
   }
+}
+
+export function dispatchCounterUpdate(nicId: number, flow: FlowTuple, bytes: bigint) {
+  const canonical = normalizeFlow(flow);
+  globalFlowTracker.recordTraffic(nicId, canonical, bytes);
 }

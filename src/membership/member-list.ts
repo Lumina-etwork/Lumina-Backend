@@ -48,4 +48,21 @@ export class MemberList {
     const shuffled = [...pool].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, count);
   }
+
+  entropyTracker(): number {
+    const members = this.getAllMembers();
+    if (members.length === 0) return 0;
+    const prefixCounts = new Map<string, number>();
+    for (const m of members) {
+      const prefix = m.id.length >= 4 ? m.id.slice(0, 4) : m.id;
+      prefixCounts.set(prefix, (prefixCounts.get(prefix) ?? 0) + 1);
+    }
+    let entropy = 0;
+    const total = members.length;
+    for (const count of prefixCounts.values()) {
+      const p = count / total;
+      entropy -= p * Math.log2(p);
+    }
+    return entropy;
+  }
 }

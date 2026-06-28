@@ -33,6 +33,9 @@ pub const WRITE_LOCK_TIMEOUT_MS: u64 = 50;
 /// Duration after removal during which a node cannot be re-added.
 pub const EVICTION_COOLDOWN: Duration = Duration::from_secs(300);
 
+/// Maximum evictions per cooldown window before oldest entries are released.
+pub const BATCH_EVICTION_LIMIT: usize = 10;
+
 // ─── Data types ───────────────────────────────────────────────────────────────
 
 /// Stable identifier for a DHT peer (hex-encoded, variable length).
@@ -67,6 +70,10 @@ pub struct RoutingTable {
     /// Nodes removed within the last [`EVICTION_COOLDOWN`] — prevents
     /// immediate re-insertion of a flapping peer.
     evicted_cooldown: RwLock<HashMap<NodeId, Instant>>,
+    /// Tracks eviction count in the current cooldown window for batch enforcement.
+    eviction_count: RwLock<usize>,
+    /// Window start for batch eviction tracking.
+    batch_window_start: RwLock<Instant>,
 }
 
 // ─── NodeId helpers ──────────────────────────────────────────────────────────
@@ -190,6 +197,8 @@ impl RoutingTable {
         Self {
             buckets,
             evicted_cooldown: RwLock::new(HashMap::new()),
+            eviction_count: RwLock::new(0),
+            batch_window_start: RwLock::new(Instant::now()),
         }
     }
 
@@ -221,19 +230,29 @@ impl RoutingTable {
         }
 
         let idx = bucket_index(local_id, &entry.id);
-        let mut bucket = self.buckets[idx]
-            .write()
-            .map_err(|_| InsertError::LockPoisoned)?;
-
-        // Try-lock semantics: if we can't acquire within 50 ms we defer.
-        // In practice RwLock::write() blocks; to implement the timeout
-        // we use try_write in the caller or wrap with a park_timeout.
-        // For now, the lock is held briefly so contention is minimal.
+        let deadline = Instant::now() + Duration::from_millis(WRITE_LOCK_TIMEOUT_MS);
+        let mut bucket;
+        loop {
+            match self.buckets[idx].try_write() {
+                Ok(b) => {
+                    bucket = b;
+                    break;
+                }
+                Err(_) => {
+                    if Instant::now() >= deadline {
+                        return Err(InsertError::LockContended);
+                    }
+                    std::thread::yield_now();
+                }
+            }
+        }
         Ok(bucket.insert(entry))
     }
 
     /// Evict the LRS node from the bucket at `bucket_idx` and insert the
     /// replacement. Records the evicted node in the cooldown map.
+    /// Enforces batch eviction: if more than BATCH_EVICTION_LIMIT evictions
+    /// occur in the cooldown window, the oldest entries are released early.
     pub fn evict_and_insert(
         &self,
         local_id: &str,
@@ -258,6 +277,34 @@ impl RoutingTable {
             drop(bucket); // release before acquiring write lock on cooldown
             if let Ok(mut cd) = self.evicted_cooldown.write() {
                 cd.insert(lrs_id, Instant::now());
+            }
+
+            // Batch eviction enforcement
+            if let Ok(mut count) = self.eviction_count.write() {
+                *count += 1;
+                if *count > BATCH_EVICTION_LIMIT {
+                    if let Ok(mut window_start) = self.batch_window_start.write() {
+                        if window_start.elapsed() < EVICTION_COOLDOWN {
+                            // Release oldest entries from cooldown early
+                            if let Ok(mut cd) = self.evicted_cooldown.write() {
+                                let mut to_release: Vec<NodeId> = Vec::new();
+                                for (id, t) in cd.iter() {
+                                    if t.elapsed() > EVICTION_COOLDOWN / 2 {
+                                        to_release.push(id.clone());
+                                        if to_release.len() >= 5 {
+                                            break;
+                                        }
+                                    }
+                                }
+                                for id in to_release {
+                                    cd.remove(&id);
+                                }
+                            }
+                        }
+                        *window_start = Instant::now();
+                    }
+                    *count = 0;
+                }
             }
 
             // Re-acquire and insert
@@ -323,6 +370,7 @@ impl RoutingTable {
 #[derive(Debug)]
 pub enum InsertError {
     LockPoisoned,
+    LockContended,
     EvictionCooldown { retry_after: Duration },
 }
 
