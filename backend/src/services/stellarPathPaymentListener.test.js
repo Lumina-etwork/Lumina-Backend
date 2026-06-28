@@ -98,7 +98,7 @@ describe('StellarPathPaymentListener', () => {
 
   describe('initialization', () => {
     it('should initialize with default configuration', () => {
-      expect(stellarPathPaymentListener.horizonUrl).toBe('https://horizon.stellar.org');
+      expect(stellarPathPaymentListener.horizonUrl).toBe(process.env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org');
       expect(stellarPathPaymentListener.isListening).toBe(false);
       expect(stellarPathPaymentListener.retryCount).toBe(0);
       expect(stellarPathPaymentListener.maxRetries).toBe(5);
