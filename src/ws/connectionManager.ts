@@ -157,8 +157,11 @@ export class ConnectionManager extends EventEmitter {
     socket: WebSocketLike,
     opts: NodeConnectionOptions = {},
   ): ConnectionEntry {
-    // Delegate entirely to pool.add() which contains all the
-    // grace-window / generation-counter logic.
+    // If the node is still 'connected', begin disconnect to enter grace window
+    // (reconnect arrives before disconnect handler — reconnect wins the race).
+    if (this.pool.isConnected(nodeId)) {
+      this.pool.beginDisconnect(nodeId);
+    }
     return this.handleConnect(nodeId, socket, opts);
   }
 

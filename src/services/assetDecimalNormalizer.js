@@ -30,7 +30,7 @@ class AssetDecimalNormalizer {
     this.defaultDecimals = 7;
     
     // Maximum precision for internal calculations
-    this.maxPrecision = 18;
+    this.maxPrecision = 24;
     
     // Configure BigNumber for high precision
     BigNumber.config({
@@ -238,8 +238,11 @@ class AssetDecimalNormalizer {
   formatAmount(amount, assetCode) {
     const decimals = this.getAssetDecimals(assetCode);
     const bnAmount = new BigNumber(amount);
-    
-    return bnAmount.decimalPlaces(decimals).toString();
+    const rounded = bnAmount.decimalPlaces(decimals);
+    if (rounded.isInteger()) {
+      return rounded.toFixed();
+    }
+    return rounded.toFixed(decimals);
   }
 }
 

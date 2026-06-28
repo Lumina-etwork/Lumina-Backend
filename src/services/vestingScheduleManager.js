@@ -235,7 +235,7 @@ class VestingScheduleManager {
       .dividedBy(totalBalance)
       .toNumber();
       
-    return new Date(weightedTimestamp).toISOString();
+    return new Date(weightedTimestamp).toISOString().replace(/\.\d{3}Z$/, 'Z');
   }
 
   calculateWeightedAverageDuration(schedule1, schedule2, totalBalance, resultAssetCode = 'XLM') {

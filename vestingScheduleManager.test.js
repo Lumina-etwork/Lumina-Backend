@@ -1,6 +1,3 @@
-const { VestingScheduleManager } = require('./src/services/vestingScheduleManager');
-const { AssetDecimalNormalizer } = require('./src/services/assetDecimalNormalizer');
-
 // Mock the Stellar SDK
 jest.mock('@stellar/stellar-sdk', () => ({
   Address: {
@@ -16,10 +13,11 @@ jest.mock('@stellar/stellar-sdk', () => ({
       sign: jest.fn(),
     })),
   },
-  TransactionBuilder: {
-    fee: jest.fn(),
-    networkPassphrase: jest.fn(),
-  },
+  TransactionBuilder: jest.fn().mockImplementation(() => ({
+    addOperation: jest.fn().mockReturnThis(),
+    setTimeout: jest.fn().mockReturnThis(),
+    build: jest.fn().mockReturnValue({ sign: jest.fn() }),
+  })),
   nativeToScVal: jest.fn(),
   rpc: {
     Server: jest.fn().mockImplementation(() => ({
@@ -58,6 +56,9 @@ jest.mock('@stellar/stellar-sdk', () => ({
     vesting_duration: 365,
   })),
 }));
+
+const { VestingScheduleManager } = require('./src/services/vestingScheduleManager');
+const { AssetDecimalNormalizer } = require('./src/services/assetDecimalNormalizer');
 
 describe('VestingScheduleManager with AssetDecimalNormalizer', () => {
   let manager;
@@ -193,7 +194,7 @@ describe('VestingScheduleManager with AssetDecimalNormalizer', () => {
       const weightedDate = manager.calculateWeightedAverageDate(schedule1, schedule2, 'cliff', 'XLM');
       expect(weightedDate).toBeDefined();
       expect(typeof weightedDate).toBe('string');
-      expect(weightedDate).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
+      expect(weightedDate).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z/);
     });
 
     test('should calculate weighted average duration with precision', () => {

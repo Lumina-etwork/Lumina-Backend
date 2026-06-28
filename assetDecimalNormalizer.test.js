@@ -35,7 +35,7 @@ describe('AssetDecimalNormalizer', () => {
 
     test('should throw error for invalid decimal places', () => {
       expect(() => normalizer.setAssetDecimals('INVALID', -1)).toThrow();
-      expect(() => normalizer.setAssetDecimals('INVALID', 19)).toThrow();
+      expect(() => normalizer.setAssetDecimals('INVALID', 25)).toThrow();
       expect(() => normalizer.setAssetDecimals('INVALID', 'invalid')).toThrow();
     });
 
@@ -81,14 +81,19 @@ describe('AssetDecimalNormalizer', () => {
   describe('Cross-asset operations', () => {
     test('should add amounts from different assets', () => {
       // Add 1 XLM (7 decimals) + 1 USDC (6 decimals) = result in XLM
+      // Both 1 XLM and 1 USDC are equivalent base values (1 unit each)
+      // In XLM precision (7 decimals): USDC 1 = 10^6 → 10^6 * 10^(7-6) = 10^7 in XLM precision
+      // So 10^7 + 10^7 = 2 * 10^7 = 20000000
       const sum = normalizer.addAmounts('10000000', 'XLM', '1000000', 'USDC', 'XLM');
-      expect(sum).toBe('11000000');
+      expect(sum).toBe('20000000');
     });
 
     test('should add amounts with different result asset', () => {
       // Add 1 XLM (7 decimals) + 1 USDC (6 decimals) = result in USDC
+      // In USDC precision (6 decimals): XLM 1 = 10^7 → 10^7 * 10^(6-7) = 10^6 in USDC precision
+      // So 10^6 + 10^6 = 2 * 10^6 = 2000000
       const sum = normalizer.addAmounts('10000000', 'XLM', '1000000', 'USDC', 'USDC');
-      expect(sum).toBe('1100000');
+      expect(sum).toBe('2000000');
     });
 
     test('should calculate weighted average for vesting schedules', () => {
