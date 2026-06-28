@@ -155,8 +155,11 @@ jobs:
       - name: Install Stellar CLI
         run: |
           if ! command -v stellar &> /dev/null; then
-            sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
-            cargo install --locked stellar-cli
+            wget -q https://github.com/stellar/stellar-cli/releases/download/v27.0.0/stellar-cli-27.0.0-x86_64-unknown-linux-gnu.tar.gz
+            tar -xzf stellar-cli-27.0.0-x86_64-unknown-linux-gnu.tar.gz
+            mkdir -p $HOME/.cargo/bin
+            mv stellar $HOME/.cargo/bin/
+            chmod +x $HOME/.cargo/bin/stellar
           fi
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
