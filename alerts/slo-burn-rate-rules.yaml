@@ -1,0 +1,34 @@
+groups:
+  - name: lumina-slo-burn-rate
+    interval: 30s
+    rules:
+      - record: lumina:slo_availability_error_ratio
+        expr: sum(rate(http_requests_total{code=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))
+        labels:
+          window: fast
+      - record: lumina:slo_availability_error_ratio
+        expr: sum(rate(http_requests_total{code=~"5.."}[1h])) / sum(rate(http_requests_total[1h]))
+        labels:
+          window: slow
+      - record: lumina:http_request_duration_seconds:p99
+        expr: histogram_quantile(0.99, sum by (le, route) (rate(http_request_duration_seconds_bucket{critical_path="true"}[5m])))
+        labels:
+          window: fast
+      - alert: LuminaSLOBurnRateFast
+        expr: (lumina:slo_availability_error_ratio{window="fast"} / 0.0001) >= 14.4 or lumina:http_request_duration_seconds:p99{window="fast"} > 0.1
+        for: 2m
+        labels:
+          severity: page
+          slo: system-availability
+        annotations:
+          summary: Fast SLO burn rate or P99 latency breach
+          runbook: docs/runbooks/slo-burn-rate.md
+      - alert: LuminaSLOBurnRateSlow
+        expr: (lumina:slo_availability_error_ratio{window="slow"} / 0.0001) >= 6
+        for: 10m
+        labels:
+          severity: ticket
+          slo: system-availability
+        annotations:
+          summary: Sustained SLO burn rate breach
+          runbook: docs/runbooks/slo-burn-rate.md
