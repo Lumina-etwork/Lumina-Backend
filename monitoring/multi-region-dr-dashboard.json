@@ -1,0 +1,16 @@
+{
+  "title": "Lumina Multi-Region DR",
+  "panels": [
+    { "title": "Critical API P99 by Region", "query": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{route=~'/api/(vaults|claims|dr).*'}[5m])) by (le, region))" },
+    { "title": "PostgreSQL Replication Lag", "query": "max by (region) (postgres_replication_lag_seconds)" },
+    { "title": "Backup Freshness", "query": "time() - max by (region) (postgres_last_verified_backup_timestamp_seconds)" },
+    { "title": "Active Mutating Workers", "query": "sum by (region) (lumina_mutating_worker_active)" },
+    { "title": "DR Failover Decisions", "query": "lumina_dr_failover_decision" }
+  ],
+  "alerts": [
+    { "name": "CriticalPathP99Exceeded", "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, region)) > 0.1", "for": "5m" },
+    { "name": "ReplicationLagExceeded", "expr": "postgres_replication_lag_seconds > 5", "for": "2m" },
+    { "name": "BackupRpoExceeded", "expr": "time() - postgres_last_verified_backup_timestamp_seconds > 60", "for": "1m" },
+    { "name": "DuplicateWriteWorkers", "expr": "sum(lumina_mutating_worker_active) > 1", "for": "1m" }
+  ]
+}
