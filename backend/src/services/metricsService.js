@@ -29,13 +29,43 @@ const totalIndexedBlocks = new client.Gauge({
   help: 'Total number of ledger blocks indexed'
 });
 
+const configAuditDuration = new client.Histogram({
+  name: 'runtime_config_audit_duration_seconds',
+  help: 'Runtime configuration audit duration in seconds',
+  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1]
+});
+
+const configDriftKeys = new client.Gauge({
+  name: 'runtime_config_drift_keys',
+  help: 'Number of runtime configuration keys currently drifting from baseline'
+});
+
+const configAuditStatus = new client.Gauge({
+  name: 'runtime_config_audit_status',
+  help: 'Runtime configuration audit status as a one-hot gauge',
+  labelNames: ['status']
+});
+
+const configDriftDetected = new client.Counter({
+  name: 'runtime_config_drift_detected_total',
+  help: 'Total runtime configuration drift detections'
+});
+
 register.registerMetric(apiResponseTime);
 register.registerMetric(activeDbConnections);
 register.registerMetric(totalIndexedBlocks);
+register.registerMetric(configAuditDuration);
+register.registerMetric(configDriftKeys);
+register.registerMetric(configAuditStatus);
+register.registerMetric(configDriftDetected);
 
 module.exports = {
   register,
   apiResponseTime,
   activeDbConnections,
-  totalIndexedBlocks
+  totalIndexedBlocks,
+  configAuditDuration,
+  configDriftKeys,
+  configAuditStatus,
+  configDriftDetected
 };
