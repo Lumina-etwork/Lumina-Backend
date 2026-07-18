@@ -29,13 +29,36 @@ const totalIndexedBlocks = new client.Gauge({
   help: 'Total number of ledger blocks indexed'
 });
 
+const auditEventsTotal = new client.Counter({
+  name: 'audit_events_total',
+  help: 'Total audit events written to the tamper-evident audit trail',
+  labelNames: ['action', 'result']
+});
+
+const auditVerificationTotal = new client.Counter({
+  name: 'audit_hash_chain_verifications_total',
+  help: 'Total audit hash-chain verification runs',
+  labelNames: ['result']
+});
+
+const auditHashChainVerifiedEntries = new client.Gauge({
+  name: 'audit_hash_chain_verified_entries',
+  help: 'Number of audit entries checked in the most recent verification run'
+});
+
 register.registerMetric(apiResponseTime);
 register.registerMetric(activeDbConnections);
 register.registerMetric(totalIndexedBlocks);
+register.registerMetric(auditEventsTotal);
+register.registerMetric(auditVerificationTotal);
+register.registerMetric(auditHashChainVerifiedEntries);
 
 module.exports = {
   register,
   apiResponseTime,
   activeDbConnections,
-  totalIndexedBlocks
+  totalIndexedBlocks,
+  auditEventsTotal,
+  auditVerificationTotal,
+  auditHashChainVerifiedEntries
 };
