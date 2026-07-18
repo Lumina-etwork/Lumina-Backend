@@ -164,6 +164,7 @@ app.use("/api/user", vaultPauseMiddleware);
 app.use("/api/admin/vault", vaultPauseMiddleware);
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
+app.use("/api/audit-trail", require("./routes/auditTrail"));
 
 const claimRateLimiter = rateLimit({
   windowMs: 60 * 1000,
