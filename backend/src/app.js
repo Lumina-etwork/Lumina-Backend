@@ -278,6 +278,7 @@ const futureLienRoutes = require("./routes/futureLienRoutes");
 const healthRoutes = require("./routes/healthRoutes");
 const kycStatusRoutes = require("./routes/kycStatusRoutes");
 const unlockProjectionRoutes = require("./routes/unlockProjectionRoutes");
+const { router: runtimeConfigAuditRoutes } = require("./routes/runtimeConfigAuditRoutes");
 
 app.get("/", (req, res) => {
   res.json({ message: "Vesting Vault API is running!" });
@@ -335,6 +336,8 @@ app.get("/health/ready", async (req, res) => {
 });
 
 // Liveness probe endpoint
+app.use("/api", runtimeConfigAuditRoutes);
+
 app.get("/health/live", (req, res) => {
   // Simple liveness check - just confirms the process is running
   const uptime = process.uptime();

@@ -1,0 +1,22 @@
+groups:
+  - name: runtime-config-drift
+    rules:
+      - alert: RuntimeConfigDriftDetected
+        expr: runtime_config_drift_keys > 0
+        for: 2m
+        labels:
+          severity: critical
+          service: vesting-vault-backend
+        annotations:
+          summary: Runtime configuration drift detected
+          description: "{{ $value }} runtime configuration keys differ from the approved baseline."
+          runbook_url: runbooks/runtime-config-drift.md
+      - alert: RuntimeConfigAuditLatencyHigh
+        expr: histogram_quantile(0.99, sum(rate(runtime_config_audit_duration_seconds_bucket[5m])) by (le)) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: vesting-vault-backend
+        annotations:
+          summary: Runtime configuration audit latency exceeded 100ms P99
+          description: Runtime configuration audit latency is above the critical path target.

@@ -1,0 +1,21 @@
+{
+  "title": "Runtime Configuration Drift",
+  "schemaVersion": 39,
+  "panels": [
+    {
+      "title": "Drifting Keys",
+      "type": "stat",
+      "targets": [{ "expr": "runtime_config_drift_keys" }]
+    },
+    {
+      "title": "Audit P99 Latency",
+      "type": "timeseries",
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(runtime_config_audit_duration_seconds_bucket[5m])) by (le))" }]
+    },
+    {
+      "title": "Drift Detections",
+      "type": "timeseries",
+      "targets": [{ "expr": "increase(runtime_config_drift_detected_total[1h])" }]
+    }
+  ]
+}
