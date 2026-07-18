@@ -278,6 +278,7 @@ const futureLienRoutes = require("./routes/futureLienRoutes");
 const healthRoutes = require("./routes/healthRoutes");
 const kycStatusRoutes = require("./routes/kycStatusRoutes");
 const unlockProjectionRoutes = require("./routes/unlockProjectionRoutes");
+const multiRegionDrRoutes = require("./routes/multiRegionDr");
 
 app.get("/", (req, res) => {
   res.json({ message: "Vesting Vault API is running!" });
@@ -539,6 +540,9 @@ app.use("/api/ledger-reorg", require('./routes/ledgerReorg'));
 
 // Mount vesting history routes (optimized PostgreSQL queries)
 app.use("/api/vesting-history", require('./routes/vestingHistory'));
+
+// Mount multi-region disaster recovery planning routes
+app.use("/api/dr", multiRegionDrRoutes);
 
 // Historical price tracking job management endpoints
 app.post("/api/admin/jobs/historical-prices/start", async (req, res) => {
