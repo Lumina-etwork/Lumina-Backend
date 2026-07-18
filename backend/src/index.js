@@ -27,6 +27,7 @@ const gdprComplianceJob = require('./jobs/gdprComplianceJob');
 const historicalPriceTrackingJob = require('./jobs/historicalPriceTrackingJob');
 const vaultBalanceMonitoringJob = require('./jobs/vaultBalanceMonitoringJob');
 const VestingStateReconciliationJob = require('./jobs/vestingStateReconciliationJob');
+const SecretRotationJob = require('./jobs/secretRotationJob');
 
 const startServer = async () => {
   const secretsService = require('./services/secretsService');
@@ -243,6 +244,14 @@ if (require.main === module) {
       console.log("Continuing without Soroban event indexing...");
     }
   })();
+
+  // Start Secret Rotation Job
+  try {
+    const secretRotationJob = new SecretRotationJob();
+    secretRotationJob.start();
+  } catch (jobError) {
+    console.error("Failed to initialize Secret Rotation Job:", jobError);
+  }
 
   // Start KYC expiration worker
   console.log('Starting KYC expiration monitoring worker...');
