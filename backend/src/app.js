@@ -15,6 +15,7 @@ const { rateLimit } = require('express-rate-limit');
 const { walletRateLimitMiddleware } = require('./middleware/wallet-ratelimit.middleware');
 const { smartCompression } = require('./middleware/compression.middleware');
 const { paginateWithCursor, validateCursorParams } = require('./services/cursorPaginationService');
+const { payloadFieldEncryptionMiddleware } = require('./middleware/payloadEncryption.middleware');
 
 const Sentry = require('@sentry/node');
 const { nodeProfilingIntegration } = require('@sentry/profiling-node');
@@ -124,6 +125,7 @@ app.use(tracingMiddleware);
 app.use(helmetMiddleware);
 app.use(strictCors);
 app.use(express.json());
+app.use(payloadFieldEncryptionMiddleware());
 app.use(require("cookie-parser")());
 
 // Apply metrics middleware
