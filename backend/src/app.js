@@ -31,11 +31,21 @@ const metricsService = require("./services/metricsService");
 const { metricsMiddleware } = require("./middleware/metrics.middleware");
 const { globalRateLimiter, authRateLimiter } = require("./middleware/rateLimit.middleware");
 const queueService = require("./services/queueService");
+const { configManager } = require('./config');
 // Initialize worker
 require("./workers/heavyComputationWorker");
 
 
 dotenv.config();
+
+configManager.load();
+if (process.env.NODE_ENV !== 'test') {
+  configManager.startWatching();
+}
+metricsService.configVersion.set(configManager.version);
+configManager.on('reloaded', ({ version }) => {
+  metricsService.configVersion.set(version);
+});
 
 const app = express();
 
@@ -128,6 +138,15 @@ app.use(require("cookie-parser")());
 
 // Apply metrics middleware
 app.use(metricsMiddleware);
+
+app.get('/api/config/status', (req, res) => {
+  res.json({
+    success: true,
+    version: configManager.version,
+    strategy: configManager.get('deployment.strategy'),
+    criticalPathP99Ms: configManager.get('server.criticalPathP99Ms'),
+  });
+});
 
 // Apply global rate limiting
 app.use(globalRateLimiter);

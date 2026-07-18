@@ -29,13 +29,28 @@ const totalIndexedBlocks = new client.Gauge({
   help: 'Total number of ledger blocks indexed'
 });
 
+const configReloadsTotal = new client.Counter({
+  name: 'config_reloads_total',
+  help: 'Runtime configuration reload attempts by status',
+  labelNames: ['status']
+});
+
+const configVersion = new client.Gauge({
+  name: 'config_version',
+  help: 'Monotonically increasing runtime configuration version loaded by the process'
+});
+
 register.registerMetric(apiResponseTime);
 register.registerMetric(activeDbConnections);
 register.registerMetric(totalIndexedBlocks);
+register.registerMetric(configReloadsTotal);
+register.registerMetric(configVersion);
 
 module.exports = {
   register,
   apiResponseTime,
   activeDbConnections,
-  totalIndexedBlocks
+  totalIndexedBlocks,
+  configReloadsTotal,
+  configVersion
 };
