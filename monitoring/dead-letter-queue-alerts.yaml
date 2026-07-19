@@ -1,0 +1,19 @@
+groups:
+  - name: dead-letter-queue
+    rules:
+      - alert: DeadLetterQueueMessages
+        expr: increase(dlq_messages_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Messages are landing in the dead letter queue
+          description: '{{ $labels.source_queue }} / {{ $labels.job_name }} is producing DLQ messages for reason {{ $labels.reason }}.'
+      - alert: DeadLetterQueueCaptureFailures
+        expr: increase(dlq_capture_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Dead letter queue capture failed
+          description: 'Failed to capture messages from {{ $labels.source_queue }} for reason {{ $labels.reason }}.'

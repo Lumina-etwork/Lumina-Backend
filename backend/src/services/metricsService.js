@@ -29,28 +29,46 @@ const totalIndexedBlocks = new client.Gauge({
   help: 'Total number of ledger blocks indexed'
 });
 
-const configReloadsTotal = new client.Counter({
-  name: 'config_reloads_total',
-  help: 'Runtime configuration reload attempts by status',
-  labelNames: ['status']
+const dlqMessagesTotal = new client.Counter({
+  name: 'dlq_messages_total',
+  help: 'Total number of messages moved to the dead letter queue',
+  labelNames: ['source_queue', 'job_name', 'reason'],
 });
 
-const configVersion = new client.Gauge({
-  name: 'config_version',
-  help: 'Monotonically increasing runtime configuration version loaded by the process'
+const dlqCaptureFailuresTotal = new client.Counter({
+  name: 'dlq_capture_failures_total',
+  help: 'Total number of failures while moving messages to the dead letter queue',
+  labelNames: ['source_queue', 'reason'],
+});
+
+const dlqRetriesTotal = new client.Counter({
+  name: 'dlq_retries_total',
+  help: 'Total number of dead letter queue messages manually replayed',
+  labelNames: ['source_queue', 'job_name'],
 });
 
 register.registerMetric(apiResponseTime);
 register.registerMetric(activeDbConnections);
 register.registerMetric(totalIndexedBlocks);
-register.registerMetric(configReloadsTotal);
-register.registerMetric(configVersion);
+register.registerMetric(dlqMessagesTotal);
+register.registerMetric(dlqCaptureFailuresTotal);
+register.registerMetric(dlqRetriesTotal);
 
 module.exports = {
   register,
   apiResponseTime,
   activeDbConnections,
   totalIndexedBlocks,
-  configReloadsTotal,
-  configVersion
+  dlqMessagesTotal,
+  dlqCaptureFailuresTotal,
+  dlqRetriesTotal,
+  recordDlqMessage(sourceQueue, jobName, reason) {
+    dlqMessagesTotal.inc({ source_queue: sourceQueue, job_name: jobName, reason });
+  },
+  recordDlqFailure(sourceQueue, reason) {
+    dlqCaptureFailuresTotal.inc({ source_queue: sourceQueue, reason });
+  },
+  recordDlqRetry(sourceQueue, jobName) {
+    dlqRetriesTotal.inc({ source_queue: sourceQueue, job_name: jobName });
+  }
 };
