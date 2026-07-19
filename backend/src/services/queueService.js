@@ -1,10 +1,13 @@
 const { Queue } = require('bullmq');
 const ioredis = require('ioredis');
+const { DeadLetterQueueService } = require('./deadLetterQueueService');
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const connection = new ioredis(REDIS_URL, {
   maxRetriesPerRequest: null
 });
+
+const deadLetterQueueService = new DeadLetterQueueService({ connection });
 
 const heavyComputationQueue = new Queue('heavy-computation', {
   connection,
@@ -17,6 +20,8 @@ const heavyComputationQueue = new Queue('heavy-computation', {
     removeOnComplete: true,
   }
 });
+
+deadLetterQueueService.attachToQueue('heavy-computation', { queue: heavyComputationQueue, connection });
 
 class QueueService {
   async addGenerateCsvJob(vaultId) {
@@ -36,6 +41,13 @@ class QueueService {
       result: job.returnvalue
     };
   }
+
+  async retryDeadLetterJob(jobId) {
+    return deadLetterQueueService.retry(jobId, heavyComputationQueue);
+  }
 }
 
-module.exports = new QueueService();
+const queueService = new QueueService();
+queueService.deadLetterQueueService = deadLetterQueueService;
+
+module.exports = queueService;
