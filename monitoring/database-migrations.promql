@@ -1,0 +1,8 @@
+# Alert when any migration job fails during a deployment window.
+increase(db_migration_failures_total[15m]) > 0
+
+# Alert when migrations remain pending after release rollout.
+db_migration_pending_total > 0
+
+# Watch migration duration during canary analysis.
+histogram_quantile(0.99, sum(rate(db_migration_duration_ms_bucket[15m])) by (le, direction)) > 30000
