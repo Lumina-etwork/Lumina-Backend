@@ -29,46 +29,46 @@ const totalIndexedBlocks = new client.Gauge({
   help: 'Total number of ledger blocks indexed'
 });
 
-const secretRotationAttempts = new client.Counter({
-  name: 'secret_rotation_attempts_total',
-  help: 'Total number of secret rotation attempts',
-  labelNames: ['secret_type', 'provider']
+const dlqMessagesTotal = new client.Counter({
+  name: 'dlq_messages_total',
+  help: 'Total number of messages moved to the dead letter queue',
+  labelNames: ['source_queue', 'job_name', 'reason'],
 });
 
-const secretRotationFailures = new client.Counter({
-  name: 'secret_rotation_failures_total',
-  help: 'Total number of failed secret rotation attempts',
-  labelNames: ['secret_type', 'provider']
+const dlqCaptureFailuresTotal = new client.Counter({
+  name: 'dlq_capture_failures_total',
+  help: 'Total number of failures while moving messages to the dead letter queue',
+  labelNames: ['source_queue', 'reason'],
 });
 
-const secretRotationDuration = new client.Histogram({
-  name: 'secret_rotation_duration_seconds',
-  help: 'Duration of secret rotation workflows in seconds',
-  labelNames: ['secret_type', 'provider'],
-  buckets: [0.01, 0.05, 0.1, 0.3, 0.5, 1, 3, 5, 10, 30]
-});
-
-const secretRotationStatus = new client.Gauge({
-  name: 'secret_rotation_status',
-  help: 'Latest secret rotation status by secret type and provider (1=healthy, 0=failed)',
-  labelNames: ['secret_type', 'provider']
+const dlqRetriesTotal = new client.Counter({
+  name: 'dlq_retries_total',
+  help: 'Total number of dead letter queue messages manually replayed',
+  labelNames: ['source_queue', 'job_name'],
 });
 
 register.registerMetric(apiResponseTime);
 register.registerMetric(activeDbConnections);
 register.registerMetric(totalIndexedBlocks);
-register.registerMetric(secretRotationAttempts);
-register.registerMetric(secretRotationFailures);
-register.registerMetric(secretRotationDuration);
-register.registerMetric(secretRotationStatus);
+register.registerMetric(dlqMessagesTotal);
+register.registerMetric(dlqCaptureFailuresTotal);
+register.registerMetric(dlqRetriesTotal);
 
 module.exports = {
   register,
   apiResponseTime,
   activeDbConnections,
   totalIndexedBlocks,
-  secretRotationAttempts,
-  secretRotationFailures,
-  secretRotationDuration,
-  secretRotationStatus
+  dlqMessagesTotal,
+  dlqCaptureFailuresTotal,
+  dlqRetriesTotal,
+  recordDlqMessage(sourceQueue, jobName, reason) {
+    dlqMessagesTotal.inc({ source_queue: sourceQueue, job_name: jobName, reason });
+  },
+  recordDlqFailure(sourceQueue, reason) {
+    dlqCaptureFailuresTotal.inc({ source_queue: sourceQueue, reason });
+  },
+  recordDlqRetry(sourceQueue, jobName) {
+    dlqRetriesTotal.inc({ source_queue: sourceQueue, job_name: jobName });
+  }
 };
