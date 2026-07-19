@@ -1,0 +1,30 @@
+{
+  "title": "Lumina System SLO and Burn Rate",
+  "schemaVersion": 39,
+  "tags": ["slo", "availability", "latency", "burn-rate"],
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "30d Availability SLO",
+      "targets": [{ "expr": "100 * (1 - lumina:slo_availability_error_ratio{window=\"30d\"})" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 99.99 }] } } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Burn Rate by Window",
+      "targets": [{ "expr": "lumina:slo_availability_error_ratio / 0.0001", "legendFormat": "{{window}}" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Critical Path P99 Latency",
+      "targets": [{ "expr": "1000 * lumina:http_request_duration_seconds:p99", "legendFormat": "{{route}}" }],
+      "fieldConfig": { "defaults": { "unit": "ms", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 100 }] } } }
+    },
+    {
+      "type": "table",
+      "title": "Active SLO Alerts",
+      "targets": [{ "expr": "ALERTS{alertname=~\"LuminaSLOBurnRate.*\",alertstate=\"firing\"}" }]
+    }
+  ]
+}

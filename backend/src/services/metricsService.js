@@ -29,43 +29,46 @@ const totalIndexedBlocks = new client.Gauge({
   help: 'Total number of ledger blocks indexed'
 });
 
-const configAuditDuration = new client.Histogram({
-  name: 'runtime_config_audit_duration_seconds',
-  help: 'Runtime configuration audit duration in seconds',
-  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1]
+const dlqMessagesTotal = new client.Counter({
+  name: 'dlq_messages_total',
+  help: 'Total number of messages moved to the dead letter queue',
+  labelNames: ['source_queue', 'job_name', 'reason'],
 });
 
-const configDriftKeys = new client.Gauge({
-  name: 'runtime_config_drift_keys',
-  help: 'Number of runtime configuration keys currently drifting from baseline'
+const dlqCaptureFailuresTotal = new client.Counter({
+  name: 'dlq_capture_failures_total',
+  help: 'Total number of failures while moving messages to the dead letter queue',
+  labelNames: ['source_queue', 'reason'],
 });
 
-const configAuditStatus = new client.Gauge({
-  name: 'runtime_config_audit_status',
-  help: 'Runtime configuration audit status as a one-hot gauge',
-  labelNames: ['status']
-});
-
-const configDriftDetected = new client.Counter({
-  name: 'runtime_config_drift_detected_total',
-  help: 'Total runtime configuration drift detections'
+const dlqRetriesTotal = new client.Counter({
+  name: 'dlq_retries_total',
+  help: 'Total number of dead letter queue messages manually replayed',
+  labelNames: ['source_queue', 'job_name'],
 });
 
 register.registerMetric(apiResponseTime);
 register.registerMetric(activeDbConnections);
 register.registerMetric(totalIndexedBlocks);
-register.registerMetric(configAuditDuration);
-register.registerMetric(configDriftKeys);
-register.registerMetric(configAuditStatus);
-register.registerMetric(configDriftDetected);
+register.registerMetric(dlqMessagesTotal);
+register.registerMetric(dlqCaptureFailuresTotal);
+register.registerMetric(dlqRetriesTotal);
 
 module.exports = {
   register,
   apiResponseTime,
   activeDbConnections,
   totalIndexedBlocks,
-  configAuditDuration,
-  configDriftKeys,
-  configAuditStatus,
-  configDriftDetected
+  dlqMessagesTotal,
+  dlqCaptureFailuresTotal,
+  dlqRetriesTotal,
+  recordDlqMessage(sourceQueue, jobName, reason) {
+    dlqMessagesTotal.inc({ source_queue: sourceQueue, job_name: jobName, reason });
+  },
+  recordDlqFailure(sourceQueue, reason) {
+    dlqCaptureFailuresTotal.inc({ source_queue: sourceQueue, reason });
+  },
+  recordDlqRetry(sourceQueue, jobName) {
+    dlqRetriesTotal.inc({ source_queue: sourceQueue, job_name: jobName });
+  }
 };

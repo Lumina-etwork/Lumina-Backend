@@ -27598,6 +27598,35 @@ This document summarizes the implementation of the requested issues for the Vest
 - Request retry with backoff
 - Endpoint health status API
 
+
+
+## End-to-End Encryption for Sensitive Payload Fields (#72)
+
+Lumina Backend supports opt-in field-level encryption for sensitive API payload fields. The feature is designed as an application-wide envelope that runs immediately after JSON parsing, decrypting inbound client-encrypted fields before route handlers execute and encrypting configured sensitive fields before JSON responses leave the service. This keeps controller and service logic unchanged while preventing plaintext sensitive values from traversing untrusted clients, logs, browser storage, and intermediary infrastructure.
+
+### Architecture
+
+- **Envelope format**: encrypted fields are JSON objects marked with `__encrypted: true`, version `lpfe:v1`, algorithm `AES-256-GCM`, and Base64 encoded `iv`, authentication `tag`, and ciphertext `ct` values.
+- **Authenticated encryption**: each field uses a random 96-bit IV with AES-256-GCM. The field path is supplied as additional authenticated data so ciphertext cannot be replayed into a different sensitive field.
+- **System-wide middleware**: `payloadFieldEncryptionMiddleware` decrypts request bodies and wraps `res.json` to encrypt outbound sensitive fields when `PAYLOAD_FIELD_ENCRYPTION_ENABLED=true`.
+- **Key loading**: `PAYLOAD_FIELD_ENCRYPTION_KEY` accepts Base64, 64-character hex, or passphrase input. Operators should source it from the existing secrets manager/HSM flow and rotate by blue-green deployment.
+- **Field policy**: defaults cover common PII and secrets (`email`, `tax_id`, `fullName`, `dateOfBirth`, `privateKey`, etc.). Override with `PAYLOAD_SENSITIVE_FIELDS` as a comma-separated list for service-specific payloads.
+
+### Operations and rollout
+
+1. Ship the middleware disabled and verify dashboards for API latency and 4xx rates.
+2. Enable client-side encryption for canary clients and set `PAYLOAD_FIELD_ENCRYPTION_ENABLED=true` on the green deployment only.
+3. Compare P99 latency, encryption/decryption errors, and route-level success rates between blue and green. The target is less than 100ms P99 overhead on critical paths.
+4. Promote green only after security review confirms key provenance, field policy, log redaction, and ciphertext interoperability.
+5. Roll back by routing traffic to blue or disabling `PAYLOAD_FIELD_ENCRYPTION_ENABLED`; encrypted request fields remain backward-compatible because clients can retry against green after rollback.
+
+### Monitoring and alerting
+
+- Alert on spikes in `400 Invalid encrypted payload field` responses, which indicate malformed ciphertext, key mismatch, or unsupported clients.
+- Track route P99 latency before and after enablement to enforce the `<100ms` critical-path performance target.
+- Add dashboard panels for adoption percentage, encrypted-field error rate, and response payload size growth.
+- Ensure application logs never serialize decrypted request bodies or encrypted key material.
+
 ## #256 - Implement API Payload Signature Verification ✅
 
 **Status**: COMPLETED  

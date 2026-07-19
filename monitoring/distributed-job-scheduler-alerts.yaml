@@ -1,0 +1,17 @@
+groups:
+  - name: distributed-job-scheduler
+    rules:
+      - alert: SchedulerClaimLatencyHigh
+        expr: histogram_quantile(0.99, sum(rate(scheduler_claim_latency_seconds_bucket[5m])) by (le)) > 0.1
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: Distributed scheduler claim P99 exceeds 100ms
+      - alert: SchedulerFailureRateHigh
+        expr: increase(scheduler_jobs_failed_total[5m]) > 25
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Distributed scheduler failures are increasing
