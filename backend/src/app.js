@@ -339,6 +339,8 @@ app.get("/health/ready", async (req, res) => {
 });
 
 // Liveness probe endpoint
+app.use("/api", runtimeConfigAuditRoutes);
+
 app.get("/health/live", (req, res) => {
   // Simple liveness check - just confirms the process is running
   const uptime = process.uptime();
