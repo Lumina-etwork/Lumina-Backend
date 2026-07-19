@@ -20,15 +20,17 @@
     "test": "jest",
     "test:soroban": "jest --testPathPattern=soroban",
     "test:pii": "jest piiScrubbing.test.js",
-    "migrate": "node migrations/runMigrations.js",
-    "migrate:rollback": "knex migrate:rollback",
+    "migrate": "node migrations/runMigrations.js up",
+    "migrate:rollback": "node migrations/runMigrations.js down",
     "migrate:make": "knex migrate:make",
     "migrate:list": "knex migrate:list",
-    "migrate:up": "knex migrate:up",
-    "migrate:down": "knex migrate:down",
+    "migrate:up": "node migrations/runMigrations.js up",
+    "migrate:down": "node migrations/runMigrations.js down",
     "health-check": "node migrations/healthChecker.js",
     "swagger:generate": "GENERATE_SWAGGER=true node -e \"require('./src/utils/swaggerGenerator').generateSwagger()\"",
-    "docs": "npm run swagger:generate && echo 'Documentation available at http://localhost:3000/api/docs'"
+    "docs": "npm run swagger:generate && echo 'Documentation available at http://localhost:3000/api/docs'",
+    "setup:local": "bash scripts/setup-local-dev.sh",
+    "setup:local:check": "bash scripts/setup-local-dev.sh --check-only --skip-install --skip-docker"
   },
   "dependencies": {
     "@apollo/server": "^4.10.0",

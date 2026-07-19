@@ -29,36 +29,46 @@ const totalIndexedBlocks = new client.Gauge({
   help: 'Total number of ledger blocks indexed'
 });
 
-const auditEventsTotal = new client.Counter({
-  name: 'audit_events_total',
-  help: 'Total audit events written to the tamper-evident audit trail',
-  labelNames: ['action', 'result']
+const dlqMessagesTotal = new client.Counter({
+  name: 'dlq_messages_total',
+  help: 'Total number of messages moved to the dead letter queue',
+  labelNames: ['source_queue', 'job_name', 'reason'],
 });
 
-const auditVerificationTotal = new client.Counter({
-  name: 'audit_hash_chain_verifications_total',
-  help: 'Total audit hash-chain verification runs',
-  labelNames: ['result']
+const dlqCaptureFailuresTotal = new client.Counter({
+  name: 'dlq_capture_failures_total',
+  help: 'Total number of failures while moving messages to the dead letter queue',
+  labelNames: ['source_queue', 'reason'],
 });
 
-const auditHashChainVerifiedEntries = new client.Gauge({
-  name: 'audit_hash_chain_verified_entries',
-  help: 'Number of audit entries checked in the most recent verification run'
+const dlqRetriesTotal = new client.Counter({
+  name: 'dlq_retries_total',
+  help: 'Total number of dead letter queue messages manually replayed',
+  labelNames: ['source_queue', 'job_name'],
 });
 
 register.registerMetric(apiResponseTime);
 register.registerMetric(activeDbConnections);
 register.registerMetric(totalIndexedBlocks);
-register.registerMetric(auditEventsTotal);
-register.registerMetric(auditVerificationTotal);
-register.registerMetric(auditHashChainVerifiedEntries);
+register.registerMetric(dlqMessagesTotal);
+register.registerMetric(dlqCaptureFailuresTotal);
+register.registerMetric(dlqRetriesTotal);
 
 module.exports = {
   register,
   apiResponseTime,
   activeDbConnections,
   totalIndexedBlocks,
-  auditEventsTotal,
-  auditVerificationTotal,
-  auditHashChainVerifiedEntries
+  dlqMessagesTotal,
+  dlqCaptureFailuresTotal,
+  dlqRetriesTotal,
+  recordDlqMessage(sourceQueue, jobName, reason) {
+    dlqMessagesTotal.inc({ source_queue: sourceQueue, job_name: jobName, reason });
+  },
+  recordDlqFailure(sourceQueue, reason) {
+    dlqCaptureFailuresTotal.inc({ source_queue: sourceQueue, reason });
+  },
+  recordDlqRetry(sourceQueue, jobName) {
+    dlqRetriesTotal.inc({ source_queue: sourceQueue, job_name: jobName });
+  }
 };

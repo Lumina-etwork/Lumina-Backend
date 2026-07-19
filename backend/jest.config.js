@@ -12,6 +12,15 @@ module.exports = {
     '!src/**/*.test.js',
     '!src/**/index.js'
   ],
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 75,
+      lines: 80,
+      statements: 80
+    }
+  },
+  coverageReporters: ['text', 'lcov', 'json-summary'],
   maxWorkers: '50%',
   bail: false
 };

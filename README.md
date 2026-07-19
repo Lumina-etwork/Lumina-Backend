@@ -23,16 +23,19 @@ Ensure you have the required toolchains installed:
 ```bash
 # Clone the repository (if running manually)
 git clone https://github.com/Lumina-etwork/Lumina-Backend
+cd Lumina-Backend
 
-# Install dependencies or build
-npm install
+# Validate prerequisites without changing files
+npm run setup:local:check
 
-# Run database migrations
-npm run migrate
+# Bootstrap environment files, dependencies, Docker services, and migrations
+npm run setup:local
 
 # Start the API server
 npm run start
 ```
+
+The onboarding script is idempotent: it keeps existing `.env` files, creates missing local environment files from checked-in examples, installs root and `backend/` dependencies, optionally fetches Rust contract dependencies, starts PostgreSQL/Redis with Docker Compose, and runs database migrations. Use `scripts/setup-local-dev.sh --help` for flags such as `--skip-install`, `--skip-docker`, and `--check-only`.
 
 ## 🤝 Contributing
 Contributions are highly welcome. Please ensure your commits are cryptographically signed using GPG or SSH keys. For major structural changes, please open an issue first to discuss your proposal.
