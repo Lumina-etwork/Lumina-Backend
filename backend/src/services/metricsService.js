@@ -47,12 +47,73 @@ const dlqRetriesTotal = new client.Counter({
   labelNames: ['source_queue', 'job_name'],
 });
 
+const capacityDbPoolUsage = new client.Gauge({
+  name: 'lumina_capacity_db_pool_usage_ratio',
+  help: 'Database connection pool usage ratio (0-1)',
+  labelNames: ['type'],
+});
+
+const capacityQueueDepth = new client.Gauge({
+  name: 'lumina_capacity_queue_depth',
+  help: 'Current depth of BullMQ queues',
+  labelNames: ['queue'],
+});
+
+const capacityDlqDepth = new client.Gauge({
+  name: 'lumina_capacity_dlq_depth',
+  help: 'Current number of messages in the dead letter queue',
+  labelNames: ['source_queue'],
+});
+
+const capacityProcessCpuRatio = new client.Gauge({
+  name: 'lumina_capacity_process_cpu_ratio',
+  help: 'Node.js process CPU usage ratio (0-1)',
+});
+
+const capacityProcessMemoryBytes = new client.Gauge({
+  name: 'lumina_capacity_process_memory_bytes',
+  help: 'Node.js process memory usage in bytes',
+  labelNames: ['type'],
+});
+
+const capacityEventLoopLagMs = new client.Gauge({
+  name: 'lumina_capacity_event_loop_lag_ms',
+  help: 'Event loop lag in milliseconds',
+});
+
+const capacityThroughputTrendSlope = new client.Gauge({
+  name: 'lumina_capacity_throughput_trend_slope',
+  help: 'Trend slope for throughput metrics',
+  labelNames: ['route', 'method'],
+});
+
+const capacityProjectedExhaustionDays = new client.Gauge({
+  name: 'lumina_capacity_projected_exhaustion_days',
+  help: 'Projected days until capacity limit is reached',
+  labelNames: ['metric', 'limit'],
+});
+
+const capacityAnomalyCount = new client.Gauge({
+  name: 'lumina_capacity_anomaly_count',
+  help: 'Number of detected anomalies per metric',
+  labelNames: ['metric'],
+});
+
 register.registerMetric(apiResponseTime);
 register.registerMetric(activeDbConnections);
 register.registerMetric(totalIndexedBlocks);
 register.registerMetric(dlqMessagesTotal);
 register.registerMetric(dlqCaptureFailuresTotal);
 register.registerMetric(dlqRetriesTotal);
+register.registerMetric(capacityDbPoolUsage);
+register.registerMetric(capacityQueueDepth);
+register.registerMetric(capacityDlqDepth);
+register.registerMetric(capacityProcessCpuRatio);
+register.registerMetric(capacityProcessMemoryBytes);
+register.registerMetric(capacityEventLoopLagMs);
+register.registerMetric(capacityThroughputTrendSlope);
+register.registerMetric(capacityProjectedExhaustionDays);
+register.registerMetric(capacityAnomalyCount);
 
 module.exports = {
   register,
@@ -62,6 +123,15 @@ module.exports = {
   dlqMessagesTotal,
   dlqCaptureFailuresTotal,
   dlqRetriesTotal,
+  capacityDbPoolUsage,
+  capacityQueueDepth,
+  capacityDlqDepth,
+  capacityProcessCpuRatio,
+  capacityProcessMemoryBytes,
+  capacityEventLoopLagMs,
+  capacityThroughputTrendSlope,
+  capacityProjectedExhaustionDays,
+  capacityAnomalyCount,
   recordDlqMessage(sourceQueue, jobName, reason) {
     dlqMessagesTotal.inc({ source_queue: sourceQueue, job_name: jobName, reason });
   },

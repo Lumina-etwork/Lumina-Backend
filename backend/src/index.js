@@ -253,6 +253,16 @@ if (require.main === module) {
     console.error("Failed to initialize Secret Rotation Job:", jobError);
   }
 
+  // Start Capacity Metrics Collector
+  try {
+    const CapacityMetricsCollector = require('./services/capacityMetricsCollector');
+    const collector = new CapacityMetricsCollector();
+    collector.start(parseInt(process.env.CAPACITY_COLLECTION_INTERVAL_MS) || 60000);
+    console.log('Capacity Metrics Collector started successfully.');
+  } catch (collectorError) {
+    console.error("Failed to initialize Capacity Metrics Collector:", collectorError);
+  }
+
   // Start KYC expiration worker
   console.log('Starting KYC expiration monitoring worker...');
   kycExpirationWorker.start();
