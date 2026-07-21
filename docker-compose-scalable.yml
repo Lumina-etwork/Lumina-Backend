@@ -230,7 +230,7 @@ services:
   # Database Health Monitor
   db-health-monitor:
     build:
-      context: ./database/health-monitor
+      context: ./legacy_cleanup/database/health-monitor
       dockerfile: Dockerfile
     container_name: vesting-vault-db-health-monitor
     restart: unless-stopped
