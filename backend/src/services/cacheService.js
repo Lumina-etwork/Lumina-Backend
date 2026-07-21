@@ -129,13 +129,18 @@ class CacheService {
   async get(key) {
     try {
       if (!this.isConnected || !this.client) {
+        const bmService = require('./benchmarkMetricsService');
+        bmService.recordCacheMiss();
         return null;
       }
 
       const value = await this.client.get(key);
+      const bmService = require('./benchmarkMetricsService');
       if (value) {
+        bmService.recordCacheHit();
         return JSON.parse(value);
       }
+      bmService.recordCacheMiss();
       return null;
     } catch (error) {
       console.error(`Error getting cache key ${key}:`, error);

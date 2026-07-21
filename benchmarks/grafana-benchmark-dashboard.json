@@ -1,0 +1,154 @@
+{
+  "title": "Benchmark Performance History",
+  "description": "Tracks benchmark metrics over time per scenario. Requires Prometheus data source with k6 metrics or JSON API plugin for S3 reports.",
+  "panels": [
+    {
+      "title": "API Throughput (req/s) by Scenario",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "avg(http_reqs_rate{scenario=\"normal-load\"})",
+          "legendFormat": "Normal Load"
+        },
+        {
+          "expr": "avg(http_reqs_rate{scenario=\"peak-load\"})",
+          "legendFormat": "Peak Load"
+        },
+        {
+          "expr": "avg(http_reqs_rate{scenario=\"stress-test\"})",
+          "legendFormat": "Stress Test"
+        }
+      ],
+      "description": "Average requests per second per scenario across benchmark runs"
+    },
+    {
+      "title": "P95 Latency (ms) by Scenario",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "avg(http_req_duration_p95{scenario=\"normal-load\"})", "legendFormat": "Normal Load" },
+        { "expr": "avg(http_req_duration_p95{scenario=\"peak-load\"})", "legendFormat": "Peak Load" },
+        { "expr": "avg(http_req_duration_p95{scenario=\"stress-test\"})", "legendFormat": "Stress Test" }
+      ],
+      "description": "95th percentile request duration in milliseconds"
+    },
+    {
+      "title": "P99 Latency (ms) by Scenario",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "avg(http_req_duration_p99{scenario=\"normal-load\"})", "legendFormat": "Normal Load" },
+        { "expr": "avg(http_req_duration_p99{scenario=\"peak-load\"})", "legendFormat": "Peak Load" },
+        { "expr": "avg(http_req_duration_p99{scenario=\"stress-test\"})", "legendFormat": "Stress Test" }
+      ]
+    },
+    {
+      "title": "Error Rate (%)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "avg(http_req_failed_rate{scenario=\"normal-load\"}) * 100", "legendFormat": "Normal Load" },
+        { "expr": "avg(http_req_failed_rate{scenario=\"peak-load\"}) * 100", "legendFormat": "Peak Load" },
+        { "expr": "avg(http_req_failed_rate{scenario=\"stress-test\"}) * 100", "legendFormat": "Stress Test" }
+      ],
+      "unit": "percent"
+    },
+    {
+      "title": "DB Query Latency P95 (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "avg(db_query_duration_p95{scenario=\"normal-load\"})", "legendFormat": "Normal Load" },
+        { "expr": "avg(db_query_duration_p95{scenario=\"peak-load\"})", "legendFormat": "Peak Load" },
+        { "expr": "avg(db_query_duration_p95{scenario=\"stress-test\"})", "legendFormat": "Stress Test" }
+      ],
+      "description": "95th percentile database query duration in milliseconds"
+    },
+    {
+      "title": "Cache Hit Ratio",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "avg(cache_hit_ratio{scenario=\"normal-load\"})", "legendFormat": "Normal Load" },
+        { "expr": "avg(cache_hit_ratio{scenario=\"peak-load\"})", "legendFormat": "Peak Load" },
+        { "expr": "avg(cache_hit_ratio{scenario=\"stress-test\"})", "legendFormat": "Stress Test" }
+      ],
+      "unit": "percentunit",
+      "description": "Ratio of cache hits to total cache lookups"
+    },
+    {
+      "title": "Latency Comparison - Normal Load",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        { "expr": "avg(http_req_duration_p50{scenario=\"normal-load\"})", "legendFormat": "p50" },
+        { "expr": "avg(http_req_duration_p95{scenario=\"normal-load\"})", "legendFormat": "p95" },
+        { "expr": "avg(http_req_duration_p99{scenario=\"normal-load\"})", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "title": "Latency Comparison - Peak Load",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        { "expr": "avg(http_req_duration_p50{scenario=\"peak-load\"})", "legendFormat": "p50" },
+        { "expr": "avg(http_req_duration_p95{scenario=\"peak-load\"})", "legendFormat": "p95" },
+        { "expr": "avg(http_req_duration_p99{scenario=\"peak-load\"})", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "title": "Benchmark History Table",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "expr": "benchmark_run_info",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": {}, "indexByName": {} } }
+      ],
+      "description": "Lists recent benchmark runs with commit SHA, scenario, and status"
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "scenario",
+        "type": "custom",
+        "query": "normal-load,peak-load,stress-test",
+        "current": { "text": "All", "value": "" },
+        "label": "Scenario",
+        "allValue": "",
+        "includeAll": true,
+        "multi": true
+      },
+      {
+        "name": "branch",
+        "type": "query",
+        "query": "label_values(benchmark_run_info, branch)",
+        "current": { "text": "main", "value": "main" },
+        "label": "Branch",
+        "allValue": "",
+        "includeAll": false
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Regression Detected",
+        "type": "tags",
+        "tags": ["regression"],
+        "iconColor": "red",
+        "enable": true
+      }
+    ]
+  },
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "utc"
+}
