@@ -25,6 +25,10 @@ pids
 
 # 
 node_modules
+
+# Husky internal runtime
+.husky/_
+
 Coverage directory used by tools like istanbul
 coverage/
 *.lcov

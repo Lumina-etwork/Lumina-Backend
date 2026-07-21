@@ -30,7 +30,8 @@
     "swagger:generate": "GENERATE_SWAGGER=true node -e \"require('./src/utils/swaggerGenerator').generateSwagger()\"",
     "docs": "npm run swagger:generate && echo 'Documentation available at http://localhost:3000/api/docs'",
     "setup:local": "bash scripts/setup-local-dev.sh",
-    "setup:local:check": "bash scripts/setup-local-dev.sh --check-only --skip-install --skip-docker"
+    "setup:local:check": "bash scripts/setup-local-dev.sh --check-only --skip-install --skip-docker",
+    "prepare": "husky"
   },
   "dependencies": {
     "@apollo/server": "^4.10.0",
@@ -131,6 +132,20 @@
     "supertest": "^7.0.0",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "uuid": "^14.0.1"
+    "uuid": "^14.0.1",
+    "@commitlint/cli": "^19.8.0",
+    "@commitlint/config-conventional": "^19.8.0",
+    "@eslint/js": "^9.24.0",
+    "commitlint": "^19.8.0",
+    "eslint": "^10.7.0",
+    "eslint-config-prettier": "^10.1.2",
+    "eslint-plugin-prettier": "^5.4.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "prettier": "^3.5.3",
+    "secretlint": "^9.3.0",
+    "@secretlint/secretlint-rule-preset-recommend": "^9.3.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.32.0"
   }
 }

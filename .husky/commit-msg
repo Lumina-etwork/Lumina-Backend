@@ -1,0 +1,5 @@
+if [ -n "$HOOK_METRICS_ENABLED" ] && [ "$HOOK_METRICS_ENABLED" != "0" ]; then
+  node scripts/track-hook-metrics.js commit-msg "npx --no -- commitlint --edit $1"
+else
+  npx --no -- commitlint --edit "$1"
+fi
