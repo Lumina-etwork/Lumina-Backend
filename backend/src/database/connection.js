@@ -70,6 +70,13 @@ const initializeDatabase = async () => {
       );
     }
   }
+
+  try {
+    const benchmarkMetricsService = require('../services/benchmarkMetricsService');
+    benchmarkMetricsService.createSequelizeHook(sequelize);
+  } catch (e) {
+    // Benchmark metrics service not available or benchmark mode off
+  }
   
   return sequelize;
 };

@@ -357,6 +357,23 @@ app.get("/health/ready", async (req, res) => {
   }
 });
 
+// Benchmark metrics endpoint (internal metrics for load testing)
+const benchmarkMetricsService = require("./services/benchmarkMetricsService");
+if (benchmarkMetricsService.isBenchmarkMode()) {
+  app.get("/api/v1/benchmark/metrics", (req, res) => {
+    const metrics = benchmarkMetricsService.getMetrics();
+    res.json({
+      success: true,
+      benchmark: metrics,
+    });
+  });
+
+  app.post("/api/v1/benchmark/metrics/reset", (req, res) => {
+    benchmarkMetricsService.resetMetrics();
+    res.json({ success: true, message: "Benchmark metrics reset" });
+  });
+}
+
 // Liveness probe endpoint
 app.use("/api", runtimeConfigAuditRoutes);
 
