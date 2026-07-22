@@ -1,0 +1,5 @@
+if [ -n "$HOOK_METRICS_ENABLED" ] && [ "$HOOK_METRICS_ENABLED" != "0" ]; then
+  node scripts/track-hook-metrics.js pre-commit "npx lint-staged"
+else
+  npx lint-staged
+fi

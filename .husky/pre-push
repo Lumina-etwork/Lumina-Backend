@@ -1,0 +1,29 @@
+HOOK_START=$(date +%s%N)
+
+changed_rs=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.rs$' || true)
+if [ -n "$changed_rs" ]; then
+  if [ -f contracts/Cargo.toml ]; then
+    cargo fmt --manifest-path contracts/Cargo.toml --all -- --check
+  fi
+  if [ -f src/metering/Cargo.toml ]; then
+    cargo fmt --manifest-path src/metering/Cargo.toml --all -- --check
+  fi
+fi
+
+if [ -n "$HOOK_METRICS_ENABLED" ] && [ "$HOOK_METRICS_ENABLED" != "0" ]; then
+  HOOK_END=$(date +%s%N)
+  HOOK_DURATION_MS=$(( (HOOK_END - HOOK_START) / 1000000 ))
+  node -e "
+    const m = require('./scripts/track-hook-metrics');
+    const metrics = {
+      hook: 'pre-push',
+      result: 'pass',
+      duration_ms: $HOOK_DURATION_MS,
+      timestamp: new Date().toISOString(),
+      host: require('os').hostname(),
+      error: '',
+    };
+    m.writeMetricsFile(metrics);
+    m.pushToPushgateway(metrics);
+  "
+fi

@@ -1,0 +1,12 @@
+edition = "2021"
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+newline_style = "Auto"
+use_small_heuristics = "Max"
+reorder_impl_items = true
+reorder_imports = true
+reorder_modules = true
+chain_width = 80
+spaces_around_ranges = true
+binop_separator = "Front"
