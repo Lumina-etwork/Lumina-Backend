@@ -1,0 +1,146 @@
+{
+  "title": "Docker Build Performance",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": ["docker", "ci", "performance"],
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Avg Build Duration (7d)",
+      "id": 1,
+      "targets": [
+        {
+          "expr": "docker_build_duration_avg{service=\"backend\"}",
+          "legendFormat": "backend avg"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 120},
+              {"color": "red", "value": 360}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "P99 Build Duration (7d)",
+      "id": 2,
+      "targets": [
+        {
+          "expr": "docker_build_duration_p99{service=\"backend\"}",
+          "legendFormat": "backend p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 300},
+              {"color": "red", "value": 600}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Cache Hit Ratio (1h)",
+      "id": 3,
+      "targets": [
+        {
+          "expr": "docker_build_cache_hit_ratio",
+          "legendFormat": "hit ratio"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 0.5},
+              {"color": "green", "value": 0.8}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Build Duration Over Time",
+      "id": 4,
+      "targets": [
+        {
+          "expr": "github_actions_job_duration_seconds{job=\"docker-build\", service=\"backend\"}",
+          "legendFormat": "backend"
+        },
+        {
+          "expr": "github_actions_job_duration_seconds{job=\"docker-build\", service=\"health-monitor\"}",
+          "legendFormat": "health-monitor"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Build Frequency by Branch",
+      "id": 5,
+      "targets": [
+        {
+          "expr": "docker_build_frequency",
+          "legendFormat": "{{branch}}"
+        }
+      ]
+    },
+    {
+      "type": "bar gauge",
+      "title": "Cache Layers by Service",
+      "id": 6,
+      "targets": [
+        {
+          "expr": "docker_build_cache_misses_total",
+          "legendFormat": "{{service}} misses"
+        },
+        {
+          "expr": "docker_build_cache_hits_total",
+          "legendFormat": "{{service}} hits"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Recent Build Failures",
+      "id": 7,
+      "targets": [
+        {
+          "expr": "{job=\"docker-build\"} |= \"error\"",
+          "legendFormat": ""
+        }
+      ]
+    }
+  ]
+}

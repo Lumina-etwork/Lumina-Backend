@@ -1,32 +1,31 @@
-# Use Node.js 18 LTS as base image
-FROM node:18-alpine
+FROM node:20-alpine@sha256:25c0b18f5185b0335612a58559ff6117aaf7918ec6e1fee5306ad47b7c306188 AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
-# Install dependencies
-RUN npm ci --only=production
+COPY --chown=nodejs:nodejs package*.json ./
 
-# Copy source code
-COPY . .
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --only=production --prefer-offline --no-audit
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
+COPY --chown=nodejs:nodejs . .
 
-# Change ownership of the app directory
-RUN chown -R nodejs:nodejs /app
+RUN rm -rf __tests__ test tests coverage .git
+
+FROM node:20-alpine@sha256:25c0b18f5185b0335612a58559ff6117aaf7918ec6e1fee5306ad47b7c306188
+
+WORKDIR /app
+
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
+
+COPY --from=builder --chown=nodejs:nodejs /app /app
+
 USER nodejs
 
-# Expose port
 EXPOSE 3000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => { process.exit(r.statusCode===200?0:1) })"
 
-# Start the application
-CMD ["npm", "start"]
+CMD ["node", "src/index.js"]
