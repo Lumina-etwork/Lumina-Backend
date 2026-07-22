@@ -140,6 +140,7 @@ app.use(require("cookie-parser")());
 
 // Apply metrics middleware
 app.use(metricsMiddleware);
+app.use(require('./middleware/capacityMetrics.middleware').capacityMetricsMiddleware);
 
 app.get('/api/config/status', (req, res) => {
   res.json({
@@ -584,6 +585,9 @@ app.use("/api/vesting-history", require('./routes/vestingHistory'));
 
 // Mount multi-region disaster recovery planning routes
 app.use("/api/dr", multiRegionDrRoutes);
+
+// Mount capacity planning and historical usage trending routes
+app.use("/api/capacity", require('./routes/capacityRoutes'));
 
 // Historical price tracking job management endpoints
 app.post("/api/admin/jobs/historical-prices/start", async (req, res) => {

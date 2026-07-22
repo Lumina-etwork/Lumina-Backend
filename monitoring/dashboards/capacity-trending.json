@@ -1,0 +1,108 @@
+{
+  "title": "Capacity Planning and Usage Trending",
+  "schemaVersion": 39,
+  "tags": ["capacity", "trending", "usage"],
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "row",
+      "title": "System Resources"
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU Usage (Process)",
+      "gridPos": { "x": 0, "y": 1, "w": 6, "h": 6 },
+      "targets": [{ "expr": "lumina_capacity_process_cpu_ratio", "legendFormat": "CPU ratio" }],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory Usage (RSS)",
+      "gridPos": { "x": 6, "y": 1, "w": 6, "h": 6 },
+      "targets": [{ "expr": "lumina_capacity_process_memory_bytes{type=\"rss\"}", "legendFormat": "RSS" }],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Event Loop Lag",
+      "gridPos": { "x": 12, "y": 1, "w": 6, "h": 6 },
+      "targets": [{ "expr": "lumina_capacity_event_loop_lag_ms", "legendFormat": "lag ms" }],
+      "fieldConfig": { "defaults": { "unit": "ms", "thresholds": { "steps": [{ "color": "green" }, { "color": "orange", "value": 50 }, { "color": "red", "value": 100 }] } } }
+    },
+    {
+      "type": "stat",
+      "title": "DB Pool Usage",
+      "gridPos": { "x": 18, "y": 1, "w": 6, "h": 6 },
+      "targets": [{ "expr": "lumina_capacity_db_pool_usage_ratio", "legendFormat": "{{type}}" }],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "steps": [{ "color": "green" }, { "color": "orange", "value": 0.8 }, { "color": "red", "value": 0.95 }] } } }
+    },
+    {
+      "type": "row",
+      "title": "Queue Depths"
+    },
+    {
+      "type": "timeseries",
+      "title": "BullMQ Queue Depths",
+      "gridPos": { "x": 0, "y": 7, "w": 12, "h": 6 },
+      "targets": [{ "expr": "lumina_capacity_queue_depth", "legendFormat": "{{queue}}" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Dead Letter Queue Depth",
+      "gridPos": { "x": 12, "y": 7, "w": 12, "h": 6 },
+      "targets": [{ "expr": "lumina_capacity_dlq_depth", "legendFormat": "{{source_queue}}" }]
+    },
+    {
+      "type": "row",
+      "title": "Throughput & Latency Trends"
+    },
+    {
+      "type": "timeseries",
+      "title": "API Throughput (RPS) by Route",
+      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 6 },
+      "targets": [{ "expr": "rate(api_response_time_seconds_count[5m])", "legendFormat": "{{route}}" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "P99 Latency by Route",
+      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 6 },
+      "targets": [{ "expr": "histogram_quantile(0.99, sum by (le, route) (rate(api_response_time_seconds_bucket[5m])))", "legendFormat": "{{route}}" }],
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [{ "color": "green" }, { "color": "orange", "value": 0.1 }, { "color": "red", "value": 0.5 }] } } }
+    },
+    {
+      "type": "row",
+      "title": "Projections & Exhaustion"
+    },
+    {
+      "type": "timeseries",
+      "title": "Metric Trend with Projection",
+      "gridPos": { "x": 0, "y": 19, "w": 12, "h": 6 },
+      "targets": [
+        { "expr": "lumina_capacity_projected_exhaustion_days", "legendFormat": "days to exhaust: {{metric}} (limit {{limit}})" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "d", "thresholds": { "steps": [{ "color": "green" }, { "color": "orange", "value": 14 }, { "color": "red", "value": 7 }] } } }
+    },
+    {
+      "type": "stat",
+      "title": "Anomaly Count",
+      "gridPos": { "x": 12, "y": 19, "w": 6, "h": 6 },
+      "targets": [{ "expr": "lumina_capacity_anomaly_count", "legendFormat": "{{metric}}" }]
+    },
+    {
+      "type": "stat",
+      "title": "Throughput Trend Slope",
+      "gridPos": { "x": 18, "y": 19, "w": 6, "h": 6 },
+      "targets": [{ "expr": "lumina_capacity_throughput_trend_slope", "legendFormat": "{{route}}" }]
+    },
+    {
+      "type": "row",
+      "title": "Active Alerts"
+    },
+    {
+      "type": "table",
+      "title": "Active Capacity Alerts",
+      "gridPos": { "x": 0, "y": 25, "w": 24, "h": 6 },
+      "targets": [{ "expr": "ALERTS{alertname=~\"Capacity.*\",alertstate=\"firing\"}" }]
+    }
+  ]
+}

@@ -60,11 +60,22 @@ readinessProbe:
   timeoutSeconds: 3
   failureThreshold: 3
 
+# Capacity collector configuration
+capacityCollector:
+  enabled: true
+  intervalMs: 60000
+  retentionDays:
+    raw: 7
+    aggregated5m: 30
+    aggregated1h: 365
+
 # Non-sensitive environment config (goes into a ConfigMap)
 config:
   NODE_ENV: production
   PORT: "3000"
   LOG_LEVEL: info
+  CAPACITY_COLLECTION_INTERVAL_MS: "60000"
+  PROMETHEUS_URL: "http://prometheus:9090"
 
 # Sensitive values — set via --set or an external secrets manager.
 # These are base64-encoded when stored in the Secret.
