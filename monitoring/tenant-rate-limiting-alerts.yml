@@ -1,0 +1,14 @@
+groups:
+  - name: tenant-rate-limiting
+    rules:
+      - alert: TenantRateLimitBlockedRatioHigh
+        expr: |
+          sum by (tenant_id) (rate(tenant_rate_limit_decisions_total{decision="blocked"}[5m]))
+          /
+          sum by (tenant_id) (rate(tenant_rate_limit_decisions_total[5m])) > 0.20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High tenant rate-limit blocked ratio
+          description: Tenant {{ $labels.tenant_id }} has more than 20% requests blocked by token bucket rate limiting for 5 minutes.

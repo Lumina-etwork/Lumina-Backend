@@ -29,13 +29,21 @@ const totalIndexedBlocks = new client.Gauge({
   help: 'Total number of ledger blocks indexed'
 });
 
+const tenantRateLimitDecisions = new client.Counter({
+  name: 'tenant_rate_limit_decisions_total',
+  help: 'Per-tenant token bucket rate limit decisions',
+  labelNames: ['tenant_id', 'decision']
+});
+
 register.registerMetric(apiResponseTime);
 register.registerMetric(activeDbConnections);
 register.registerMetric(totalIndexedBlocks);
+register.registerMetric(tenantRateLimitDecisions);
 
 module.exports = {
   register,
   apiResponseTime,
   activeDbConnections,
-  totalIndexedBlocks
+  totalIndexedBlocks,
+  tenantRateLimitDecisions
 };

@@ -1,0 +1,26 @@
+{
+  "title": "Tenant Rate Limiting",
+  "schemaVersion": 39,
+  "panels": [
+    {
+      "title": "Allowed vs Blocked Requests",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (decision) (rate(tenant_rate_limit_decisions_total[5m]))",
+          "legendFormat": "{{decision}}"
+        }
+      ]
+    },
+    {
+      "title": "Blocked Ratio by Tenant",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (tenant_id) (rate(tenant_rate_limit_decisions_total{decision=\"blocked\"}[5m])) / sum by (tenant_id) (rate(tenant_rate_limit_decisions_total[5m]))",
+          "legendFormat": "{{tenant_id}}"
+        }
+      ]
+    }
+  ]
+}
