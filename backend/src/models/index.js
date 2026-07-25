@@ -53,6 +53,8 @@ const IdempotencyKey = require("./idempotencyKey");
 const VestingStateReconciliation = require("./vestingStateReconciliation");
 const ScheduledJob = require("./scheduledJob");
 const CapacityMetricSnapshot = require("./capacityMetricSnapshot");
+const SlowQuery = require("./slowQuery");
+const SlowQueryAlert = require("./slowQueryAlert");
 
 const { Token, initTokenModel } = require("./token");
 const {
@@ -127,6 +129,8 @@ const models = {
   VestingStateReconciliation,
   ScheduledJob,
   CapacityMetricSnapshot,
+  SlowQuery,
+  SlowQueryAlert,
   sequelize,
 };
 
