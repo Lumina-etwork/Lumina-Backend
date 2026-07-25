@@ -151,6 +151,28 @@ const startServer = async () => {
       if (graphQLServer) {
         console.log(`GraphQL API available at: http://localhost:${PORT}/graphql`);
       }
+      // Install graceful shutdown handler
+      const { installShutdownHandler } = require('./graceful-shutdown');
+      installShutdownHandler(httpServer, {
+        services: [
+          vaultReconciliationJob,
+          notificationService,
+          vaultRegistryIndexingJob,
+        ].filter(Boolean),
+        onPhase: (phase) => {
+          try {
+            const metricsService = require('./services/metricsService');
+            if (metricsService.shutdownPhase) {
+              metricsService.shutdownPhase.set({ phase });
+            }
+          } catch (e) {
+            // metrics not available
+          }
+        },
+        onError: (err) => {
+          console.error('[GracefulShutdown] Error during shutdown:', err);
+        },
+      });
     });
   } catch (error) {
     console.error('Unable to start server:', error);
