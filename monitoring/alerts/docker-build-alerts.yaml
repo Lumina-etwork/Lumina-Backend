@@ -1,0 +1,47 @@
+groups:
+  - name: docker-build
+    rules:
+      - alert: DockerBuildDurationExceeded
+        expr: github_actions_job_duration_seconds{job="docker-build"} > 600
+        for: 2m
+        labels:
+          severity: warning
+          service: ci-docker
+        annotations:
+          summary: Docker build exceeded 10 minutes
+          description: |
+            The docker-build job for {{ $labels.service }} took {{ $value | humanizeDuration }}.
+            Cold builds should complete within 6 minutes; cached builds within 2 minutes.
+            Investigate cache invalidation or dependency changes in the latest commit.
+          runbook_url: docs/runbooks/docker-build.md
+
+      - alert: DockerBuildCacheMissRateHigh
+        expr: |
+          rate(docker_build_cache_misses_total[1h])
+          /
+          rate(docker_build_cache_requests_total[1h])
+          > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: ci-docker
+        annotations:
+          summary: Docker build cache miss rate above 50%
+          description: |
+            Cache miss rate is {{ $value | humanizePercentage }} over the last hour.
+            Frequent cache misses slow CI and indicate unstable cache keys.
+            Review cache scopes and lockfile change frequency.
+          runbook_url: docs/runbooks/docker-build.md
+
+      - alert: DockerBuildFailed
+        expr: github_actions_workflow_conclusion{workflow="Optimized CI", conclusion="failure"} > 0
+        for: 5m
+        labels:
+          severity: critical
+          service: ci-docker
+        annotations:
+          summary: Docker build job failed
+          description: |
+            The docker-build job has failed.
+            Review CI logs for build errors, network issues, or disk space.
+          runbook_url: docs/runbooks/docker-build.md

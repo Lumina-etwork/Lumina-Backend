@@ -1,0 +1,8 @@
+{
+  "title": "Distributed Job Scheduler",
+  "panels": [
+    { "title": "Claim P99", "type": "timeseries", "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(scheduler_claim_latency_seconds_bucket[5m])) by (le))" }] },
+    { "title": "Jobs Claimed", "type": "timeseries", "targets": [{ "expr": "rate(scheduler_jobs_claimed_total[5m])" }] },
+    { "title": "Jobs Failed", "type": "timeseries", "targets": [{ "expr": "rate(scheduler_jobs_failed_total[5m])" }] }
+  ]
+}

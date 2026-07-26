@@ -1,0 +1,30 @@
+groups:
+  - name: docker-build-recording
+    rules:
+      - record: docker_build_duration_avg
+        expr: |
+          avg by (service) (
+            github_actions_job_duration_seconds{job="docker-build"}
+          )
+
+      - record: docker_build_duration_p99
+        expr: |
+          histogram_quantile(0.99,
+            sum by (le, service) (
+              rate(github_actions_job_duration_seconds_bucket{job="docker-build"}[7d])
+            )
+          )
+
+      - record: docker_build_cache_hit_ratio
+        expr: |
+          1 - (
+            rate(docker_build_cache_misses_total[1h])
+            /
+            rate(docker_build_cache_requests_total[1h])
+          )
+
+      - record: docker_build_frequency
+        expr: |
+          sum by (branch) (
+            rate(github_actions_workflow_runs_total{workflow="Optimized CI", job="docker-build"}[24h])
+          )

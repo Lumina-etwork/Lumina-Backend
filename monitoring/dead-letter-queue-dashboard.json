@@ -1,0 +1,27 @@
+{
+  "title": "Dead Letter Queue",
+  "schemaVersion": 39,
+  "panels": [
+    {
+      "title": "DLQ Messages by Queue",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum by (source_queue, job_name, reason) (increase(dlq_messages_total[5m]))" }
+      ]
+    },
+    {
+      "title": "DLQ Capture Failures",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum by (source_queue, reason) (increase(dlq_capture_failures_total[5m]))" }
+      ]
+    },
+    {
+      "title": "DLQ Replays",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum by (source_queue, job_name) (increase(dlq_retries_total[5m]))" }
+      ]
+    }
+  ]
+}

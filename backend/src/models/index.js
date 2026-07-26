@@ -51,6 +51,8 @@ const RoiCalculation = require("./roiCalculation");
 const ClaimWebhookDelivery = require("./claimWebhookDelivery");
 const IdempotencyKey = require("./idempotencyKey");
 const VestingStateReconciliation = require("./vestingStateReconciliation");
+const ScheduledJob = require("./scheduledJob");
+const CapacityMetricSnapshot = require("./capacityMetricSnapshot");
 
 const { Token, initTokenModel } = require("./token");
 const {
@@ -123,6 +125,8 @@ const models = {
   RoiCalculation,
   IdempotencyKey,
   VestingStateReconciliation,
+  ScheduledJob,
+  CapacityMetricSnapshot,
   sequelize,
 };
 

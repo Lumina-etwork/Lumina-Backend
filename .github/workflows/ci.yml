@@ -1,0 +1,284 @@
+name: Optimized CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20.11.0'
+  RUST_TOOLCHAIN: stable
+  CARGO_TERM_COLOR: always
+  DOCKER_REGISTRY: ghcr.io
+  DOCKER_IMAGE_BACKEND: ghcr.io/${{ github.repository }}/backend
+  DOCKER_IMAGE_HEALTH_MONITOR: ghcr.io/${{ github.repository }}/health-monitor
+
+jobs:
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    outputs:
+      root-node: ${{ steps.filter.outputs.root-node }}
+      backend-node: ${{ steps.filter.outputs.backend-node }}
+      rust: ${{ steps.filter.outputs.rust }}
+      infra: ${{ steps.filter.outputs.infra }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Filter paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            root-node:
+              - 'package.json'
+              - 'package-lock.json'
+              - 'src/**/*.ts'
+              - 'routes/**/*.js'
+              - 'scripts/**/*.js'
+              - 'jest.config.js'
+              - 'babel.config.json'
+            backend-node:
+              - 'backend/**'
+            rust:
+              - 'contracts/**'
+              - 'src/metering/**'
+              - 'src/**/*.rs'
+            infra:
+              - 'docker-compose*.yml'
+              - 'helm/**'
+              - 'kubernetes/**'
+              - '.env.example'
+              - '.env.*'
+            workflows:
+              - '.github/workflows/**'
+              - '.github/dependabot.yml'
+
+  root-node-tests:
+    name: Root Node tests
+    needs: changes
+    if: needs.changes.outputs.root-node == 'true' || needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      - name: Run root Jest suite
+        run: npm test -- --runInBand
+
+  backend-node-tests:
+    name: Backend service tests
+    needs: changes
+    if: needs.changes.outputs.backend-node == 'true' || needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      - name: Run backend Jest suite
+        run: npm test -- --runInBand
+
+  rust-checks:
+    name: Rust checks (${{ matrix.manifest }})
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        manifest:
+          - contracts/Cargo.toml
+          - src/metering/Cargo.toml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            contracts
+            src/metering
+      - name: Format check
+        run: cargo fmt --manifest-path ${{ matrix.manifest }} --all -- --check
+      - name: Test
+        run: cargo test --manifest-path ${{ matrix.manifest }} --locked
+
+  security:
+    name: Security review gates
+    needs: changes
+    if: always() && (needs.changes.outputs.root-node == 'true' || needs.changes.outputs.backend-node == 'true' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.infra == 'true' || needs.changes.outputs.workflows == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Root npm audit
+        run: npm audit --audit-level=high
+      - name: Backend npm audit
+        working-directory: backend
+        run: npm audit --audit-level=high
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+      - name: Audit Rust dependencies
+        run: |
+          cargo audit --file contracts/Cargo.lock
+          cargo audit --file src/metering/Cargo.lock
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+
+  infra-validation:
+    name: Infrastructure validation
+    needs: changes
+    if: needs.changes.outputs.infra == 'true' || needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Helm chart
+        run: helm lint helm
+      - name: Render Kubernetes manifests
+        run: helm template lumina helm > /tmp/lumina-rendered.yaml
+      - name: Validate blue-green manifests are present
+        run: |
+          test -f kubernetes/blue-deployment.yaml
+          test -f kubernetes/green-deployment.yaml
+          test -f kubernetes/blue-green-controller.js
+
+  docker-build:
+    name: Docker build + push
+    needs: changes
+    if: needs.changes.outputs.backend-node == 'true' || needs.changes.outputs.infra == 'true' || needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: backend
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE_BACKEND }}:${{ github.sha }}
+            ${{ env.DOCKER_IMAGE_BACKEND }}:latest
+          cache-from: type=gha,scope=docker-backend
+          cache-to: type=gha,mode=max,scope=docker-backend
+      - name: Build and push health-monitor
+        uses: docker/build-push-action@v5
+        with:
+          context: legacy_cleanup/database/health-monitor
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE_HEALTH_MONITOR }}:${{ github.sha }}
+            ${{ env.DOCKER_IMAGE_HEALTH_MONITOR }}:latest
+          cache-from: type=gha,scope=docker-health-monitor
+          cache-to: type=gha,mode=max,scope=docker-health-monitor
+
+  blue-green-deploy:
+    name: Blue-green deploy (staging)
+    needs: [docker-build, performance-smoke]
+    if: github.ref == 'refs/heads/main' && success()
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config 2>/dev/null || true
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      - name: Deploy with canary strategy
+        run: |
+          node kubernetes/blue-green-controller.js canary ${{ env.DOCKER_IMAGE_BACKEND }}:${{ github.sha }}
+      - name: Wait for canary stability
+        run: |
+          node kubernetes/blue-green-controller.js status
+          echo "Canary deployment complete for ${{ github.sha }}"
+
+  performance-smoke:
+    name: Critical-path performance smoke
+    needs: [root-node-tests, backend-node-tests, docker-build]
+    if: always() && !failure() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install root dependencies
+        run: npm ci --prefer-offline --no-audit
+      - name: Run critical-path load smoke
+        run: node scripts/run-tge-load-test.js --p99-threshold-ms=100 --duration=30 --smoke
+
+  ci-summary:
+    name: CI summary
+    needs: [changes, root-node-tests, backend-node-tests, rust-checks, security, infra-validation, docker-build, performance-smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required outcomes
+        run: |
+          echo "Root Node tests: ${{ needs.root-node-tests.result }}"
+          echo "Backend tests: ${{ needs.backend-node-tests.result }}"
+          echo "Rust checks: ${{ needs.rust-checks.result }}"
+          echo "Security: ${{ needs.security.result }}"
+          echo "Infra validation: ${{ needs.infra-validation.result }}"
+          echo "Docker build: ${{ needs.docker-build.result }}"
+          echo "Performance smoke: ${{ needs.performance-smoke.result }}"
+          for result in \
+            "${{ needs.root-node-tests.result }}" \
+            "${{ needs.backend-node-tests.result }}" \
+            "${{ needs.rust-checks.result }}" \
+            "${{ needs.security.result }}" \
+            "${{ needs.infra-validation.result }}" \
+            "${{ needs.docker-build.result }}" \
+            "${{ needs.performance-smoke.result }}"; do
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              exit 1
+            fi
+          done

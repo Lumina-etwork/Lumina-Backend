@@ -330,12 +330,10 @@ class BlueGreenController {
   }
 
   /**
-   * Get error rate for deployment version
+   * Get error rate for deployment version by querying Prometheus
    */
   async getErrorRate(version) {
     try {
-      // This would typically query your monitoring system (Prometheus, Datadog, etc.)
-      // For now, we'll simulate with a health check endpoint
       const pods = await this.k8sCoreApi.listNamespacedPod(
         this.namespace,
         undefined,
@@ -346,42 +344,111 @@ class BlueGreenController {
       );
       
       if (pods.body.items.length === 0) {
-        return 1.0; // 100% error rate if no pods
+        return 1.0;
       }
+
+      const prometheusUrl = process.env.PROMETHEUS_URL || 'http://prometheus:9090';
+      const query = `sum(rate(http_requests_total{version="${version}",status=~"5.."}[5m])) / max(sum(rate(http_requests_total{version="${version}"}[5m])), 1)`;
       
-      // In production, query Prometheus or similar for actual error rates
-      // This is a placeholder implementation
-      return 0.0; // Assume 0% error rate
+      try {
+        const response = await axios.get(`${prometheusUrl}/api/v1/query`, {
+          params: { query },
+          timeout: 5000,
+        });
+        const result = response.data?.data?.result?.[0]?.value?.[1];
+        return result ? parseFloat(result) : 0;
+      } catch {
+        console.warn('Prometheus query failed, falling back to pod health check');
+        const readyPods = pods.body.items.filter(pod =>
+          pod.status.containerStatuses?.some(s => s.ready)
+        );
+        return readyPods.length === 0 ? 1.0 : 0.0;
+      }
     } catch (error) {
       console.error(`Failed to get error rate:`, error.message);
-      return 1.0; // Assume high error rate on failure
+      return 1.0;
     }
   }
 
   /**
-   * Perform canary deployment with gradual traffic shifting
+   * Compare capacity signals between two deployment versions
+   * Returns diff metrics and whether promotion should proceed
+   */
+  async compareCapacitySignals(sourceVersion, targetVersion) {
+    const prometheusUrl = process.env.PROMETHEUS_URL || 'http://prometheus:9090';
+    const signals = {};
+    let canPromote = true;
+    const reasons = [];
+
+    const queries = {
+      p99Latency: {
+        query: `histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{version="${targetVersion}"}[5m]))) - histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{version="${sourceVersion}"}[5m])))`,
+        maxDiff: 0.01, // 10ms
+        label: 'P99 latency diff (seconds)',
+      },
+      errorRate: {
+        query: `(sum(rate(http_requests_total{version="${targetVersion}",status=~"5.."}[5m])) / max(sum(rate(http_requests_total{version="${targetVersion}"}[5m])), 1)) - (sum(rate(http_requests_total{version="${sourceVersion}",status=~"5.."}[5m])) / max(sum(rate(http_requests_total{version="${sourceVersion}"}[5m])), 1))`,
+        maxDiff: 0.005, // 0.5%
+        label: 'Error rate diff',
+      },
+    };
+
+    for (const [key, config] of Object.entries(queries)) {
+      try {
+        const response = await axios.get(`${prometheusUrl}/api/v1/query`, {
+          params: { query: config.query },
+          timeout: 5000,
+        });
+        const value = response.data?.data?.result?.[0]?.value?.[1];
+        signals[key] = value ? parseFloat(value) : 0;
+        if (Math.abs(signals[key]) > config.maxDiff) {
+          canPromote = false;
+          reasons.push(`${config.label} = ${signals[key]} exceeds max diff of ${config.maxDiff}`);
+        }
+      } catch {
+        signals[key] = null;
+        console.warn(`Could not query capacity signal: ${key}`);
+      }
+    }
+
+    return { signals, canPromote, reasons };
+  }
+
+  /**
+   * Perform canary deployment with gradual traffic shifting and capacity comparison
    */
   async canaryDeploy(imageTag, stages = [10, 25, 50, 100]) {
     console.log(`🥫 Starting canary deployment with stages: ${stages.join(', ')}%`);
     
-    // Deploy new version
     await this.deployNewVersion(imageTag, 'green');
-    
-    // Gradually increase traffic
+
+    if (stages.length === 0) stages = [100];
+
     for (const percentage of stages) {
       console.log(`📈 Shifting ${percentage}% traffic to green...`);
       
-      // Here you would implement weighted routing using Istio or similar
-      // For basic Kubernetes, we'll just switch at 100%
       if (percentage === 100) {
         await this.switchTraffic('green');
       }
-      
-      // Monitor between stages
-      await new Promise(resolve => setTimeout(resolve, 60000)); // Wait 1 minute between stages
+
+      // Wait for 2 collection cycles to gather metrics
+      await new Promise(resolve => setTimeout(resolve, 120000));
+
+      // Compare capacity signals between blue and green
+      const { canPromote, reasons } = await this.compareCapacitySignals('blue', 'green');
+      if (!canPromote && percentage < 100) {
+        console.error(`🚨 Capacity regression detected, aborting canary: ${reasons.join(', ')}`);
+        await this.rollback('blue', 'green');
+        return false;
+      } else if (!canPromote && percentage === 100) {
+        console.error(`🚨 Capacity regression detected after full promotion. Consider rollback.`);
+      } else {
+        console.log(`✅ Stage ${percentage}% passed capacity comparison`);
+      }
     }
     
     console.log(`✅ Canary deployment completed successfully!`);
+    return true;
   }
 }
 

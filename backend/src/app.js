@@ -15,6 +15,7 @@ const { rateLimit } = require('express-rate-limit');
 const { walletRateLimitMiddleware } = require('./middleware/wallet-ratelimit.middleware');
 const { smartCompression } = require('./middleware/compression.middleware');
 const { paginateWithCursor, validateCursorParams } = require('./services/cursorPaginationService');
+const { payloadFieldEncryptionMiddleware } = require('./middleware/payloadEncryption.middleware');
 
 const Sentry = require('@sentry/node');
 const { nodeProfilingIntegration } = require('@sentry/profiling-node');
@@ -31,11 +32,21 @@ const metricsService = require("./services/metricsService");
 const { metricsMiddleware } = require("./middleware/metrics.middleware");
 const { tenantRateLimitMiddleware } = require("./middleware/tenantRateLimit.middleware");
 const queueService = require("./services/queueService");
+const { configManager } = require('./config');
 // Initialize worker
 require("./workers/heavyComputationWorker");
 
 
 dotenv.config();
+
+configManager.load();
+if (process.env.NODE_ENV !== 'test') {
+  configManager.startWatching();
+}
+metricsService.configVersion.set(configManager.version);
+configManager.on('reloaded', ({ version }) => {
+  metricsService.configVersion.set(version);
+});
 
 const app = express();
 
@@ -124,10 +135,21 @@ app.use(tracingMiddleware);
 app.use(helmetMiddleware);
 app.use(strictCors);
 app.use(express.json());
+app.use(payloadFieldEncryptionMiddleware());
 app.use(require("cookie-parser")());
 
 // Apply metrics middleware
 app.use(metricsMiddleware);
+app.use(require('./middleware/capacityMetrics.middleware').capacityMetricsMiddleware);
+
+app.get('/api/config/status', (req, res) => {
+  res.json({
+    success: true,
+    version: configManager.version,
+    strategy: configManager.get('deployment.strategy'),
+    criticalPathP99Ms: configManager.get('server.criticalPathP99Ms'),
+  });
+});
 
 // Apply per-tenant token bucket rate limiting across all API routes
 app.use("/api", tenantRateLimitMiddleware());
@@ -161,6 +183,7 @@ app.use("/api/user", vaultPauseMiddleware);
 app.use("/api/admin/vault", vaultPauseMiddleware);
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
+app.use("/api/audit-trail", require("./routes/auditTrail"));
 
 const claimRateLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -275,6 +298,7 @@ const futureLienRoutes = require("./routes/futureLienRoutes");
 const healthRoutes = require("./routes/healthRoutes");
 const kycStatusRoutes = require("./routes/kycStatusRoutes");
 const unlockProjectionRoutes = require("./routes/unlockProjectionRoutes");
+const multiRegionDrRoutes = require("./routes/multiRegionDr");
 
 app.get("/", (req, res) => {
   res.json({ message: "Vesting Vault API is running!" });
@@ -331,7 +355,26 @@ app.get("/health/ready", async (req, res) => {
   }
 });
 
+// Benchmark metrics endpoint (internal metrics for load testing)
+const benchmarkMetricsService = require("./services/benchmarkMetricsService");
+if (benchmarkMetricsService.isBenchmarkMode()) {
+  app.get("/api/v1/benchmark/metrics", (req, res) => {
+    const metrics = benchmarkMetricsService.getMetrics();
+    res.json({
+      success: true,
+      benchmark: metrics,
+    });
+  });
+
+  app.post("/api/v1/benchmark/metrics/reset", (req, res) => {
+    benchmarkMetricsService.resetMetrics();
+    res.json({ success: true, message: "Benchmark metrics reset" });
+  });
+}
+
 // Liveness probe endpoint
+app.use("/api", runtimeConfigAuditRoutes);
+
 app.get("/health/live", (req, res) => {
   // Simple liveness check - just confirms the process is running
   const uptime = process.uptime();
@@ -536,6 +579,12 @@ app.use("/api/ledger-reorg", require('./routes/ledgerReorg'));
 
 // Mount vesting history routes (optimized PostgreSQL queries)
 app.use("/api/vesting-history", require('./routes/vestingHistory'));
+
+// Mount multi-region disaster recovery planning routes
+app.use("/api/dr", multiRegionDrRoutes);
+
+// Mount capacity planning and historical usage trending routes
+app.use("/api/capacity", require('./routes/capacityRoutes'));
 
 // Historical price tracking job management endpoints
 app.post("/api/admin/jobs/historical-prices/start", async (req, res) => {

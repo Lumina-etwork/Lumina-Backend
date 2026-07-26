@@ -1,0 +1,250 @@
+name: Performance Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      scenarios:
+        description: 'Scenarios to run (comma-separated: normal-load,peak-load,stress-test)'
+        required: false
+        default: 'normal-load,peak-load,stress-test'
+      target_url:
+        description: 'Target URL for benchmarks'
+        required: false
+        default: ''
+
+env:
+  NODE_VERSION: '20.11.0'
+  DEGRADATION_THRESHOLD: '5'
+  BENCHMARK_BUCKET: ${{ secrets.BENCHMARK_BUCKET || 'lumina-benchmarks' }}
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect benchmark-relevant changes
+    runs-on: ubuntu-latest
+    outputs:
+      run-benchmarks: ${{ steps.filter.outputs.run-benchmarks }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            run-benchmarks:
+              - 'backend/src/**'
+              - 'backend/package.json'
+              - 'benchmarks/**'
+              - '.github/workflows/benchmarks.yml'
+              - 'docker-compose*.yml'
+              - 'kubernetes/**'
+
+  benchmarks:
+    name: Run benchmark suite
+    needs: changes
+    if: needs.changes.outputs.run-benchmarks == 'true' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lumina_benchmark
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Run database migrations
+        working-directory: backend
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: lumina_benchmark
+          NODE_ENV: benchmark
+        run: |
+          npx knex migrate:latest --knexfile ./knexfile.js 2>/dev/null || true
+          npx sequelize-cli db:migrate 2>/dev/null || true
+
+      - name: Start backend in background
+        working-directory: backend
+        env:
+          PORT: 4000
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: lumina_benchmark
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          NODE_ENV: benchmark
+          BENCHMARK_MODE: 'true'
+        run: |
+          nohup node src/index.js > backend.log 2>&1 &
+          echo "PID=$!"
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:4000/health > /dev/null 2>&1; then
+              echo "Backend is ready"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Wait for backend readiness
+        run: |
+          for i in $(seq 1 15); do
+            if curl -s http://localhost:4000/health/ready > /dev/null 2>&1; then
+              echo "Backend is ready"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Run normal-load benchmark
+        run: node benchmarks/runner.js --scenario normal-load
+        env:
+          TARGET_URL: http://localhost:4000
+          VAULT_ADDRESSES: ${{ secrets.VAULT_ADDRESSES || '' }}
+
+      - name: Run peak-load benchmark
+        if: success() || failure()
+        run: node benchmarks/runner.js --scenario peak-load
+        env:
+          TARGET_URL: http://localhost:4000
+          VAULT_ADDRESSES: ${{ secrets.VAULT_ADDRESSES || '' }}
+
+      - name: Run stress-test benchmark
+        if: success() || failure()
+        run: node benchmarks/runner.js --scenario stress-test
+        env:
+          TARGET_URL: http://localhost:4000
+          VAULT_ADDRESSES: ${{ secrets.VAULT_ADDRESSES || '' }}
+
+      - name: Fetch S3 baselines
+        id: fetch-baselines
+        continue-on-error: true
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+        run: |
+          node -e "
+            const bm = require('./benchmarks/baseline-manager');
+            const scenarios = ['normal-load', 'peak-load', 'stress-test'];
+            const branch = (process.env.GITHUB_BASE_REF || process.env.GITHUB_REF_NAME || 'main').replace('refs/heads/', '');
+            (async () => {
+              const baselines = await bm.fetchAllBaselines(branch, scenarios);
+              require('fs').writeFileSync('benchmarks/reports/s3-baselines.json', JSON.stringify(baselines, null, 2));
+              const count = Object.values(baselines).filter(Boolean).length;
+              console.log('Fetched ' + count + '/' + scenarios.length + ' baselines');
+            })();
+          "
+
+      - name: Compare against baselines
+        id: regression-check
+        continue-on-error: true
+        env:
+          DEGRADATION_THRESHOLD: ${{ env.DEGRADATION_THRESHOLD }}
+        run: node benchmarks/regression-detector.js
+
+      - name: Comment PR on regression
+        if: steps.regression-check.outcome == 'failure' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'benchmarks/regression-report.md';
+            let body;
+            try {
+              body = fs.readFileSync(reportPath, 'utf8');
+            } catch {
+              body = '## Benchmark Regression Report\n\n❌ Performance regression detected. See workflow logs for details.';
+            }
+            github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+
+      - name: Update baselines on main merge
+        if: github.ref == 'refs/heads/main' && (success() || steps.regression-check.outcome == 'success')
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+        run: |
+          node -e "
+            const bm = require('./benchmarks/baseline-manager');
+            const report = require('./benchmarks/reports/latest.json');
+            const branch = 'main';
+            (async () => {
+              await bm.storeBaselinesForAllScenarios(branch, report);
+              console.log('Baselines updated for branch: ' + branch);
+            })();
+          "
+
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-reports
+          path: |
+            benchmarks/reports/
+            benchmarks/regression-report.md
+            benchmarks/regression-annotations.txt
+          retention-days: 30
+
+      - name: Stop backend
+        if: always()
+        run: |
+          pkill -f "node src/index.js" 2>/dev/null || true
+
+      - name: Fail on regression
+        if: steps.regression-check.outcome == 'failure'
+        run: |
+          echo "❌ Performance regression detected. See PR comment or workflow logs."
+          cat benchmarks/regression-report.md
+          exit 1

@@ -1,5 +1,10 @@
 # Pull Request: Implement observability and resilience features
 
+## Pre-Commit Verification
+
+- [ ] Pre-commit hooks pass (lint, format, secrets)
+- [ ] Commit messages follow conventional commit format
+
 ## Summary
 
 This PR implements comprehensive observability and resilience features for the Vesting Vault backend, addressing four key issues:

@@ -1,25 +1,27 @@
-FROM node:18-alpine
+FROM node:20-alpine@sha256:25c0b18f5185b0335612a58559ff6117aaf7918ec6e1fee5306ad47b7c306188 AS builder
 
 WORKDIR /app
 
-# Install dependencies
 RUN apk add --no-cache postgresql-client
 
-# Copy package files
 COPY package*.json ./
-RUN npm install --production
 
-# Copy source code
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --production --prefer-offline --no-audit
+
 COPY . .
 
-# Create logs directory
 RUN mkdir -p /app/logs
 
-# Expose health endpoint
+FROM node:20-alpine@sha256:25c0b18f5185b0335612a58559ff6117aaf7918ec6e1fee5306ad47b7c306188
+
+WORKDIR /app
+
+COPY --from=builder /app /app
+
 EXPOSE 3001
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+  CMD node -e "require('http').get('http://localhost:3001/health', (r) => { process.exit(r.statusCode===200?0:1) })"
 
 CMD ["node", "monitor.js"]

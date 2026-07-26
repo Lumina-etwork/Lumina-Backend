@@ -1,0 +1,18 @@
+groups:
+  - name: configuration-management
+    rules:
+      - alert: ConfigReloadFailuresHigh
+        expr: increase(config_reloads_total{status="failure"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Runtime configuration reload failures detected
+          description: A node rejected a hot-reload and kept its previous known-good configuration.
+      - alert: CriticalPathLatencyBudgetExceeded
+        expr: histogram_quantile(0.99, sum(rate(api_response_time_seconds_bucket[5m])) by (le)) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: API P99 exceeded 100ms critical-path budget

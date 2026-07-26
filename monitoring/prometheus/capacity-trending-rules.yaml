@@ -1,0 +1,111 @@
+# Capacity Trending Prometheus Rules
+# Combined recording and alerting rules for capacity planning
+
+groups:
+  - name: capacity_trending
+    interval: 60s
+
+    rules:
+      # ── Recording Rules ──────────────────────────────────────────────
+
+      # DB pool usage ratio (0-1)
+      - record: lumina:capacity:db_pool_usage_ratio:avg_5m
+        expr: avg by (type) (rate(lumina_capacity_db_pool_usage_ratio[5m]))
+
+      # Queue depth rate of change (jobs/s)
+      - record: lumina:capacity:queue_depth:rate_5m
+        expr: rate(lumina_capacity_queue_depth[5m])
+
+      # Event loop lag P99 over 5m
+      - record: lumina:capacity:event_loop_lag:p99_5m
+        expr: histogram_quantile(0.99, sum by (le) (rate(lumina_capacity_event_loop_lag_ms_bucket[5m])))
+
+      # Process memory growth rate
+      - record: lumina:capacity:memory:growth_rate_1h
+        expr: delta(lumina_capacity_process_memory_bytes{type="rss"}[1h]) / lumina_capacity_process_memory_bytes{type="rss"}
+
+      # ── Alerting Rules ───────────────────────────────────────────────
+
+      # DB pool exhaustion warning
+      - alert: CapacityDbPoolUsageHigh
+        expr: lumina:capacity:db_pool_usage_ratio:avg_5m > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Database connection pool usage is above 80%"
+          description: "DB pool usage is {{ $value | humanizePercentage }} for the last 5 minutes. Consider scaling or optimizing connections."
+          runbook: "docs/runbooks/capacity-exhaustion.md"
+
+      # DB pool critical
+      - alert: CapacityDbPoolUsageCritical
+        expr: lumina:capacity:db_pool_usage_ratio:avg_5m > 0.95
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Database connection pool is nearly exhausted"
+          description: "DB pool usage is {{ $value | humanizePercentage }}. Immediate action required to prevent connection starvation."
+          runbook: "docs/runbooks/capacity-exhaustion.md"
+
+      # Queue depth growing
+      - alert: CapacityQueueBacklog
+        expr: lumina:capacity:queue_depth:rate_5m > 0
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "BullMQ queue depth is growing"
+          description: "Queue depth is increasing at {{ $value | humanize }} jobs/s for the last 10 minutes. Workers may be falling behind."
+          runbook: "docs/runbooks/capacity-exhaustion.md"
+
+      # Event loop lag
+      - alert: CapacityEventLoopHigh
+        expr: lumina:capacity:event_loop_lag:p99_5m > 100
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Event loop lag is above 100ms"
+          description: "P99 event loop lag is {{ $value }}ms. Check for blocking operations or high CPU."
+          runbook: "docs/runbooks/capacity-exhaustion.md"
+
+      # Memory growth
+      - alert: CapacityMemoryGrowth
+        expr: lumina:capacity:memory:growth_rate_1h > 0.1
+        for: 30m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Memory usage growing faster than 10%/hour"
+          description: "RSS memory growing at {{ $value | humanizePercentage }} per hour. Possible memory leak."
+          runbook: "docs/runbooks/capacity-exhaustion.md"
+
+      # Throughput anomaly (requires prometheus to scrape middleware metrics)
+      - alert: CapacityThroughputAnomaly
+        expr: lumina_capacity_anomaly_count > 3
+        for: 5m
+        labels:
+          severity: ticket
+          team: backend
+        annotations:
+          summary: "Anomalous throughput pattern detected"
+          description: "Metric {{ $labels.metric }} has {{ $value }} anomalies in the current window."
+          runbook: "docs/runbooks/capacity-exhaustion.md"
+
+      # Projected exhaustion
+      - alert: CapacityExhaustionProjected
+        expr: lumina_capacity_projected_exhaustion_days < 14
+        for: 1h
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Capacity exhaustion projected in {{ $value }} days"
+          description: "Metric {{ $labels.metric }} with limit {{ $labels.limit }} projected to exhaust in {{ $value }} days."
+          runbook: "docs/runbooks/capacity-exhaustion.md"

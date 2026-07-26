@@ -1,0 +1,26 @@
+{
+  "normal-load": {
+    "display_name": "Normal Load (100 req/s)",
+    "http_req_duration": { "p50_max": 50, "p95_max": 150, "p99_max": 300 },
+    "http_reqs": { "rate_min": 80 },
+    "http_req_failed": { "rate_max": 0.01 },
+    "http_req_waiting": { "p95_max": 120 },
+    "error_rate_max": 0.01
+  },
+  "peak-load": {
+    "display_name": "Peak Load (1000 req/s)",
+    "http_req_duration": { "p50_max": 100, "p95_max": 300, "p99_max": 600 },
+    "http_reqs": { "rate_min": 800 },
+    "http_req_failed": { "rate_max": 0.02 },
+    "http_req_waiting": { "p95_max": 250 },
+    "error_rate_max": 0.02
+  },
+  "stress-test": {
+    "display_name": "Stress Test (5000 req/s peak)",
+    "http_req_duration": { "p50_max": 200, "p95_max": 500, "p99_max": 1000 },
+    "http_reqs": { "rate_min": 4000 },
+    "http_req_failed": { "rate_max": 0.05 },
+    "http_req_waiting": { "p95_max": 400 },
+    "error_rate_max": 0.05
+  }
+}

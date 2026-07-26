@@ -196,10 +196,48 @@ If you encounter issues:
 3. Ensure Docker and Docker Compose are up to date
 4. Check that ports 3000, 5432, and 6379 are available
 
+## Pre-Commit Hooks
+
+This repository uses [Husky](https://typicode.github.io/husky/) to enforce code quality before every commit and push.
+
+### Setup
+
+Hooks are automatically configured after `npm install`. To verify:
+
+```bash
+npx husky
+```
+
+### Hook Stages
+
+| Hook | When | What it checks |
+|---|---|---|
+| `pre-commit` | `git commit` | ESLint, Prettier formatting, secret detection (on staged files only via `lint-staged`) |
+| `commit-msg` | `git commit` | Conventional commit format via `commitlint` |
+| `pre-push` | `git push` | Rust formatting (`cargo fmt --check`) when `.rs` files changed |
+
+### Bypassing Hooks
+
+In emergencies, bypass hooks with:
+
+```bash
+git commit --no-verify -m "urgent: message"
+git push --no-verify
+```
+
+**Note:** CI will still enforce these checks, so bypassed commits may fail in CI.
+
+### Monitoring
+
+Set `HOOK_METRICS_ENABLED=true` to emit hook execution metrics to a local file and optionally a Prometheus Pushgateway (`PROMETHEUS_PUSHGATEWAY` env var).
+
 ## Code Style Guidelines
 
-- Use ESLint for JavaScript code formatting
-- Follow conventional commit message format
+- ESLint enforces JavaScript/TypeScript code quality (see `eslint.config.js`)
+- Prettier enforces consistent formatting (see `.prettierrc.json`)
+- Conventional commit format is enforced by commitlint (see `.commitlintrc.json`)
+- Rust code is formatted via `rustfmt` (see `rustfmt.toml`)
+- Secrets and credentials are detected by `secretlint`
 - Write meaningful variable and function names
 - Add comments for complex logic
 

@@ -27,6 +27,7 @@ const gdprComplianceJob = require('./jobs/gdprComplianceJob');
 const historicalPriceTrackingJob = require('./jobs/historicalPriceTrackingJob');
 const vaultBalanceMonitoringJob = require('./jobs/vaultBalanceMonitoringJob');
 const VestingStateReconciliationJob = require('./jobs/vestingStateReconciliationJob');
+const SecretRotationJob = require('./jobs/secretRotationJob');
 
 const startServer = async () => {
   const secretsService = require('./services/secretsService');
@@ -150,6 +151,28 @@ const startServer = async () => {
       if (graphQLServer) {
         console.log(`GraphQL API available at: http://localhost:${PORT}/graphql`);
       }
+      // Install graceful shutdown handler
+      const { installShutdownHandler } = require('./graceful-shutdown');
+      installShutdownHandler(httpServer, {
+        services: [
+          vaultReconciliationJob,
+          notificationService,
+          vaultRegistryIndexingJob,
+        ].filter(Boolean),
+        onPhase: (phase) => {
+          try {
+            const metricsService = require('./services/metricsService');
+            if (metricsService.shutdownPhase) {
+              metricsService.shutdownPhase.set({ phase });
+            }
+          } catch (e) {
+            // metrics not available
+          }
+        },
+        onError: (err) => {
+          console.error('[GracefulShutdown] Error during shutdown:', err);
+        },
+      });
     });
   } catch (error) {
     console.error('Unable to start server:', error);
@@ -243,6 +266,24 @@ if (require.main === module) {
       console.log("Continuing without Soroban event indexing...");
     }
   })();
+
+  // Start Secret Rotation Job
+  try {
+    const secretRotationJob = new SecretRotationJob();
+    secretRotationJob.start();
+  } catch (jobError) {
+    console.error("Failed to initialize Secret Rotation Job:", jobError);
+  }
+
+  // Start Capacity Metrics Collector
+  try {
+    const CapacityMetricsCollector = require('./services/capacityMetricsCollector');
+    const collector = new CapacityMetricsCollector();
+    collector.start(parseInt(process.env.CAPACITY_COLLECTION_INTERVAL_MS) || 60000);
+    console.log('Capacity Metrics Collector started successfully.');
+  } catch (collectorError) {
+    console.error("Failed to initialize Capacity Metrics Collector:", collectorError);
+  }
 
   // Start KYC expiration worker
   console.log('Starting KYC expiration monitoring worker...');
