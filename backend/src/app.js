@@ -29,7 +29,7 @@ require("./services/telemetryService");
 // Import Metrics and Queue services
 const metricsService = require("./services/metricsService");
 const { metricsMiddleware } = require("./middleware/metrics.middleware");
-const { globalRateLimiter, authRateLimiter } = require("./middleware/rateLimit.middleware");
+const { tenantRateLimitMiddleware } = require("./middleware/tenantRateLimit.middleware");
 const queueService = require("./services/queueService");
 // Initialize worker
 require("./workers/heavyComputationWorker");
@@ -129,11 +129,8 @@ app.use(require("cookie-parser")());
 // Apply metrics middleware
 app.use(metricsMiddleware);
 
-// Apply global rate limiting
-app.use(globalRateLimiter);
-
-// Apply strict rate limiting to auth routes
-app.use("/api/auth", authRateLimiter);
+// Apply per-tenant token bucket rate limiting across all API routes
+app.use("/api", tenantRateLimitMiddleware());
 
 
 // Apply smart compression to all API routes (compresses JSON >1KB)
