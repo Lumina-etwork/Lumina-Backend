@@ -118,7 +118,9 @@ if (process.env.SENTRY_DSN && Sentry.Handlers) {
 
 // OpenTelemetry tracing middleware - applies to all routes
 const { tracingMiddleware } = require("./middleware/tracing.middleware");
+const { structuredLoggingMiddleware } = require("./middleware/structuredLogging.middleware");
 app.use(tracingMiddleware);
+app.use(structuredLoggingMiddleware);
 
 // Security: Helmet (CSP, HSTS, X-Frame-Options, …) + strict CORS (Issue #260)
 app.use(helmetMiddleware);
