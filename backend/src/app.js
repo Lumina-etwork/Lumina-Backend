@@ -589,6 +589,9 @@ app.use("/api/dr", multiRegionDrRoutes);
 // Mount capacity planning and historical usage trending routes
 app.use("/api/capacity", require('./routes/capacityRoutes'));
 
+// Mount slow query monitoring routes (Issue #49)
+app.use("/api/slow-queries", require('./routes/slowQueryRoutes'));
+
 // Historical price tracking job management endpoints
 app.post("/api/admin/jobs/historical-prices/start", async (req, res) => {
   try {
