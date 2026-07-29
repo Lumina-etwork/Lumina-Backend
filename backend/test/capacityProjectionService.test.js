@@ -92,9 +92,9 @@ describe('CapacityProjectionService', () => {
     test('returns days for upward trend', async () => {
       const now = Date.now();
       const dataPoints = [];
-      for (let i = 20; i >= 0; i--) {
+      for (let i = 0; i <= 20; i++) {
         dataPoints.push({
-          snapshot_time: new Date(now - i * 86400000),
+          snapshot_time: new Date(now - (20 - i) * 86400000),
           metric_value: 30 + i,
         });
       }

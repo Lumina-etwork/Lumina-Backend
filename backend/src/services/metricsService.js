@@ -35,15 +35,47 @@ const tenantRateLimitDecisions = new client.Counter({
   labelNames: ['tenant_id', 'decision']
 });
 
+const secretRotationAttempts = new client.Counter({
+  name: 'secret_rotation_attempts_total',
+  help: 'Total secret rotation attempts',
+  labelNames: ['secret_type', 'provider']
+});
+
+const secretRotationDuration = new client.Histogram({
+  name: 'secret_rotation_duration_seconds',
+  help: 'Secret rotation duration in seconds',
+  labelNames: ['secret_type', 'provider']
+});
+
+const secretRotationStatus = new client.Gauge({
+  name: 'secret_rotation_status',
+  help: 'Status of latest rotation (1=success, 0=failure)',
+  labelNames: ['secret_type', 'provider']
+});
+
+const secretRotationFailures = new client.Counter({
+  name: 'secret_rotation_failures_total',
+  help: 'Total secret rotation failures',
+  labelNames: ['secret_type', 'provider']
+});
+
 register.registerMetric(apiResponseTime);
 register.registerMetric(activeDbConnections);
 register.registerMetric(totalIndexedBlocks);
 register.registerMetric(tenantRateLimitDecisions);
+register.registerMetric(secretRotationAttempts);
+register.registerMetric(secretRotationDuration);
+register.registerMetric(secretRotationStatus);
+register.registerMetric(secretRotationFailures);
 
 module.exports = {
   register,
   apiResponseTime,
   activeDbConnections,
   totalIndexedBlocks,
-  tenantRateLimitDecisions
+  tenantRateLimitDecisions,
+  secretRotationAttempts,
+  secretRotationDuration,
+  secretRotationStatus,
+  secretRotationFailures
 };

@@ -301,6 +301,7 @@ const healthRoutes = require("./routes/healthRoutes");
 const kycStatusRoutes = require("./routes/kycStatusRoutes");
 const unlockProjectionRoutes = require("./routes/unlockProjectionRoutes");
 const multiRegionDrRoutes = require("./routes/multiRegionDr");
+const runtimeConfigAuditRoutes = require("./routes/runtimeConfigAuditRoutes");
 
 app.get("/", (req, res) => {
   res.json({ message: "Vesting Vault API is running!" });

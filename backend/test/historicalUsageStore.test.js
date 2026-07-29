@@ -1,10 +1,16 @@
 const HistoricalUsageStore = require('../src/services/historicalUsageStore');
+const { sequelize } = require('../src/database/connection');
 
 describe('HistoricalUsageStore', () => {
   let store;
 
-  beforeEach(() => {
+  beforeAll(async () => {
+    await sequelize.sync({ force: true });
+  });
+
+  beforeEach(async () => {
     store = new HistoricalUsageStore();
+    await sequelize.sync({ force: true });
   });
 
   describe('record', () => {
