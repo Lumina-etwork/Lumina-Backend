@@ -72,7 +72,7 @@ class HistoricalUsageStore {
     return row ? row.metric_value : null;
   }
 
-  async getTimeSeries(metric_name, { from, to, source, labels, windowSeconds }) {
+  async getTimeSeries(metric_name, { from, to, source, labels, windowSeconds } = {}) {
     const where = { metric_name };
     if (from || to) {
       where.snapshot_time = {};

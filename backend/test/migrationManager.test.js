@@ -9,7 +9,7 @@ class FakeClient {
     this.queries.push({ sql, params });
     if (/SELECT version, checksum/.test(sql)) return { rows: this.rows };
     if (/INSERT INTO/.test(sql)) this.rows.push({ version: params[0], checksum: params[2] });
-    if (/UPDATE/.test(sql)) this.rows = this.rows.filter((row) => row.version !== params[0]);
+    if (/^UPDATE/.test(sql)) this.rows = this.rows.filter((row) => row.version !== params[0]);
     return { rows: [] };
   }
 }

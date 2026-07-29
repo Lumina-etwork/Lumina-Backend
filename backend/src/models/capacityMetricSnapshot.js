@@ -16,7 +16,7 @@ const CapacityMetricSnapshot = sequelize.define('CapacityMetricSnapshot', {
     allowNull: false,
   },
   labels: {
-    type: DataTypes.JSONB,
+    type: DataTypes.JSON,
     allowNull: true,
   },
   snapshot_time: {
@@ -28,9 +28,12 @@ const CapacityMetricSnapshot = sequelize.define('CapacityMetricSnapshot', {
     allowNull: false,
   },
   data_quality: {
-    type: DataTypes.ENUM('excellent', 'good', 'fair', 'poor'),
+    type: DataTypes.STRING(20),
     allowNull: false,
     defaultValue: 'good',
+    validate: {
+      isIn: [['excellent', 'good', 'fair', 'poor']],
+    },
   },
   created_at: {
     type: DataTypes.DATE,
