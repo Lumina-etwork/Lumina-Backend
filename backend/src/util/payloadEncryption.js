@@ -128,13 +128,7 @@ const encryptSensitiveFields = (input, options) => transformSensitiveFields(inpu
 const decryptSensitiveFields = (input, options) => transformSensitiveFields(input, decryptValue, options);
 
 module.exports = {
-  DEFAULT_SENSITIVE_FIELDS,
-  ENVELOPE_VERSION,
   decryptSensitiveFields,
-  decryptValue,
   encryptSensitiveFields,
-  encryptValue,
   isEncryptedEnvelope,
-  keyFromEnv,
-  normalizeFields,
 };
