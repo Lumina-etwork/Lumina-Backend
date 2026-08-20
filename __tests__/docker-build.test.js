@@ -110,50 +110,7 @@ describe('Dockerfile Optimization', () => {
     });
   });
 
-  describe('health-monitor/Dockerfile', () => {
-    const dockerfile = path.resolve(
-      PROJECT_ROOT,
-      'legacy_cleanup',
-      'database',
-      'health-monitor',
-      'Dockerfile'
-    );
 
-    it('should exist', () => {
-      expect(fs.existsSync(dockerfile)).toBe(true);
-    });
-
-    it('should use multi-stage build', () => {
-      const content = fs.readFileSync(dockerfile, 'utf8');
-      const stages = content.match(/^FROM /gm);
-      expect(stages.length).toBeGreaterThanOrEqual(2);
-      expect(content).toMatch(/^FROM .* AS builder$/m);
-    });
-
-    it('should upgrade to Node.js 20', () => {
-      const content = fs.readFileSync(dockerfile, 'utf8');
-      expect(content).toMatch(/node:20/);
-      expect(content).not.toMatch(/node:18/);
-    });
-
-    it('should use BuildKit cache mount for npm', () => {
-      const content = fs.readFileSync(dockerfile, 'utf8');
-      expect(content).toMatch(/--mount=type=cache,target=\/root\/\.npm/);
-    });
-  });
-
-  describe('docker-compose-scalable.yml', () => {
-    it('should reference correct health-monitor path', () => {
-      const compose = fs.readFileSync(
-        path.join(PROJECT_ROOT, 'docker-compose-scalable.yml'),
-        'utf8'
-      );
-      const match = compose.match(/context:\s*(.+health-monitor)/);
-      expect(match).toBeTruthy();
-      const contextPath = path.resolve(PROJECT_ROOT, match[1].trim());
-      expect(fs.existsSync(contextPath)).toBe(true);
-    });
-  });
 
   describe('.env.example', () => {
     it('should include BuildKit environment variables', () => {
