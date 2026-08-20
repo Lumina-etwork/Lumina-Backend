@@ -74,7 +74,7 @@ describe('Dockerfile Optimization', () => {
 
     it('should use direct node command not npm start', () => {
       const content = fs.readFileSync(dockerfile, 'utf8');
-      expect(content).toMatch(/^CMD \["node"/);
+      expect(content).toMatch(/^CMD \["node"/m);
       expect(content).not.toMatch(/npm start/);
     });
 
@@ -91,7 +91,7 @@ describe('Dockerfile Optimization', () => {
         path.join(BACKEND_DIR, '.dockerignore'),
         'utf8'
       );
-      const patterns = content.split('\n').filter(Boolean);
+      const patterns = content.split(/\r?\n/).filter(Boolean);
       expect(patterns).toContain('__tests__');
       expect(patterns).toContain('test');
       expect(patterns).toContain('*.test.js');
@@ -103,7 +103,7 @@ describe('Dockerfile Optimization', () => {
         path.join(BACKEND_DIR, '.dockerignore'),
         'utf8'
       );
-      const patterns = content.split('\n').filter(Boolean);
+      const patterns = content.split(/\r?\n/).filter(Boolean);
       expect(patterns).toContain('jest.config.js');
       expect(patterns).toContain('playwright.config.js');
       expect(patterns).toContain('tsconfig.json');
