@@ -1,0 +1,12 @@
+{
+  "entry": [
+    "backend/src/index.js",
+    "backend/src/app.js",
+    "backend/src/nest-bootstrap.ts",
+    "backend/src/graphql/server.js",
+    "backend/src/workers/**/*.js",
+    "backend/src/workers/**/*.ts",
+    "backend/src/jobs/**/*.js"
+  ],
+  "project": ["backend/src/**/*.{js,ts}"]
+}
