@@ -1,3 +1,5 @@
+/* eslint-env jest, node */
+/* eslint-disable no-unused-vars */
 const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -74,7 +76,7 @@ describe('Dockerfile Optimization', () => {
 
     it('should use direct node command not npm start', () => {
       const content = fs.readFileSync(dockerfile, 'utf8');
-      expect(content).toMatch(/^CMD \["node"/);
+      expect(content).toMatch(/^CMD \["node"/m);
       expect(content).not.toMatch(/npm start/);
     });
 
@@ -91,7 +93,7 @@ describe('Dockerfile Optimization', () => {
         path.join(BACKEND_DIR, '.dockerignore'),
         'utf8'
       );
-      const patterns = content.split('\n').filter(Boolean);
+      const patterns = content.split(/\r?\n/).filter(Boolean);
       expect(patterns).toContain('__tests__');
       expect(patterns).toContain('test');
       expect(patterns).toContain('*.test.js');
@@ -103,7 +105,7 @@ describe('Dockerfile Optimization', () => {
         path.join(BACKEND_DIR, '.dockerignore'),
         'utf8'
       );
-      const patterns = content.split('\n').filter(Boolean);
+      const patterns = content.split(/\r?\n/).filter(Boolean);
       expect(patterns).toContain('jest.config.js');
       expect(patterns).toContain('playwright.config.js');
       expect(patterns).toContain('tsconfig.json');
@@ -179,6 +181,28 @@ describe('Dockerfile Optimization', () => {
       expect(workflow).toMatch(/docker\/setup-buildx-action@v3/);
       expect(workflow).toMatch(/cache-from: type=gha/);
       expect(workflow).toMatch(/cache-to: type=gha,mode=max/);
+    });
+  });
+
+  describe('Monitoring files', () => {
+    it('docker-build alerting rules exist', () => {
+      expect(fs.existsSync(path.join(PROJECT_ROOT, 'monitoring', 'alerts', 'docker-build-alerts.yaml'))).toBe(true);
+    });
+    it('docker-build Prometheus rules exist', () => {
+      expect(fs.existsSync(path.join(PROJECT_ROOT, 'monitoring', 'prometheus', 'docker-build-rules.yaml'))).toBe(true);
+    });
+    it('docker-build dashboard exists with panels', () => {
+      const dash = JSON.parse(fs.readFileSync(
+        path.join(PROJECT_ROOT, 'monitoring', 'dashboards', 'docker-build-performance.json'), 'utf8'
+      ));
+      expect(dash.panels.length).toBeGreaterThanOrEqual(3);
+      expect(dash.title).toBe('Docker Build Performance');
+    });
+  });
+
+  describe('Runbook', () => {
+    it('docker-build runbook exists', () => {
+      expect(fs.existsSync(path.join(PROJECT_ROOT, 'runbooks', 'docker-build.md'))).toBe(true);
     });
   });
 
