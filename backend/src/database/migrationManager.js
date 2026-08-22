@@ -140,4 +140,4 @@ async function rollback({ client, migrationsDir = path.join(process.cwd(), 'back
   return appliedMigrations.map(({ version, name }) => ({ version, name }));
 }
 
-module.exports = { applyMigration, ensureMigrationTable, getAppliedVersions, loadMigrations, migrate, rollback, rollbackMigration, splitSqlSections };
+module.exports = { loadMigrations, migrate, rollback, splitSqlSections };
