@@ -59,6 +59,25 @@ const secretRotationFailures = new client.Counter({
   labelNames: ['secret_type', 'provider']
 });
 
+// Dead Letter Queue metrics (Issue #104)
+const dlqDepth = new client.Gauge({
+  name: 'dlq_depth',
+  help: 'Current number of messages in the dead letter queue',
+  labelNames: ['source_queue']
+});
+
+const dlqEnqueueTotal = new client.Counter({
+  name: 'dlq_enqueue_total',
+  help: 'Total number of messages enqueued to the dead letter queue',
+  labelNames: ['source_queue', 'job_name', 'reason']
+});
+
+const dlqRetryTotal = new client.Counter({
+  name: 'dlq_retry_total',
+  help: 'Total number of dead letter queue messages retried',
+  labelNames: ['source_queue', 'job_name']
+});
+
 register.registerMetric(apiResponseTime);
 register.registerMetric(activeDbConnections);
 register.registerMetric(totalIndexedBlocks);
@@ -67,6 +86,40 @@ register.registerMetric(secretRotationAttempts);
 register.registerMetric(secretRotationDuration);
 register.registerMetric(secretRotationStatus);
 register.registerMetric(secretRotationFailures);
+register.registerMetric(dlqDepth);
+register.registerMetric(dlqEnqueueTotal);
+register.registerMetric(dlqRetryTotal);
+
+/**
+ * Record a message being enqueued to the DLQ.
+ * @param {string} sourceQueue - The queue name the job originated from
+ * @param {string} jobName - The job type/name
+ * @param {string} reason - Reason for DLQ (e.g. 'exhausted_retries')
+ */
+function recordDlqMessage(sourceQueue, jobName, reason) {
+  dlqEnqueueTotal.inc({ source_queue: sourceQueue, job_name: jobName, reason });
+  dlqDepth.inc({ source_queue: sourceQueue });
+}
+
+/**
+ * Record a DLQ capture failure (error while trying to move a job to DLQ).
+ * @param {string} sourceQueue
+ * @param {string} reason
+ */
+function recordDlqFailure(sourceQueue, reason) {
+  // Increment a dedicated label on the enqueue counter to track capture errors
+  dlqEnqueueTotal.inc({ source_queue: sourceQueue, job_name: 'unknown', reason });
+}
+
+/**
+ * Record a DLQ message being retried.
+ * @param {string} sourceQueue
+ * @param {string} jobName
+ */
+function recordDlqRetry(sourceQueue, jobName) {
+  dlqRetryTotal.inc({ source_queue: sourceQueue, job_name: jobName });
+  dlqDepth.dec({ source_queue: sourceQueue });
+}
 
 module.exports = {
   register,
@@ -77,5 +130,11 @@ module.exports = {
   secretRotationAttempts,
   secretRotationDuration,
   secretRotationStatus,
-  secretRotationFailures
+  secretRotationFailures,
+  dlqDepth,
+  dlqEnqueueTotal,
+  dlqRetryTotal,
+  recordDlqMessage,
+  recordDlqFailure,
+  recordDlqRetry,
 };
