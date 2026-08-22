@@ -592,6 +592,9 @@ app.use("/api/capacity", require('./routes/capacityRoutes'));
 // Mount slow query monitoring routes (Issue #49)
 app.use("/api/slow-queries", require('./routes/slowQueryRoutes'));
 
+// Mount dead letter queue management routes (Issue #104)
+app.use("/api/dlq", require('./routes/deadLetterQueue'));
+
 // Historical price tracking job management endpoints
 app.post("/api/admin/jobs/historical-prices/start", async (req, res) => {
   try {
