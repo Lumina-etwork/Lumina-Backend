@@ -10144,26 +10144,7 @@ This implementation provides a comprehensive request de-duplication system for h
 
 ### Key Components
 
-#### 1. Request Deduplication Middleware (`requestDeduplication.middleware.js`)
-
-**Purpose**: Central component that handles request de-duplication logic.
-
-**Key Features**:
-- Request fingerprinting using SHA-256
-- In-flight request tracking (in-memory + Redis)
-- Result caching with operation-specific TTL
-- Concurrent request handling
-
-**Configuration**:
-```javascript
-app.use('/api', requestDeduplicationMiddleware.middleware({
-  enabled: true,
-  skipPaths: ['/auth', '/admin/revoke', '/admin/create', '/admin/transfer', '/claims'],
-  skipMethods: ['POST', 'PUT', 'DELETE', 'PATCH']
-}));
-```
-
-#### 2. Enhanced Services
+#### 1. Enhanced Services
 
 **TVL Service** (`tvlService.js`):
 - Automatic cache invalidation on vault/claim events
@@ -19406,7 +19387,6 @@ A comprehensive partner management module with tiered API keys, custom rate limi
 - `backend/src/models/partnerUsageTracking.js` (208 lines)
 - `backend/src/services/partnerManagementService.js` (368 lines)
 - `backend/src/routes/partnerManagement.js` (425 lines)
-- `backend/src/middleware/partnerRateLimit.middleware.js` (142 lines)
 - `database/migrations/016_create_partner_management.sql`
 
 ### Tier Configuration
