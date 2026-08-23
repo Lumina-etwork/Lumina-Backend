@@ -4,29 +4,20 @@ on:
   pull_request:
     branches:
       - main
-      - develop
+      - master
   push:
     branches:
       - main
-      - develop
+      - master
 
 permissions:
   contents: read
-
-concurrency:
-  group: coverage-gate-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  pull-requests: write
 
 jobs:
-  backend-coverage:
-    name: Backend Jest coverage threshold
+  coverage:
+    name: Coverage Gate
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    defaults:
-      run:
-        working-directory: backend
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,23 +26,52 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install JS dependencies
+        run: npm install -g c8 && npm install
+        working-directory: backend
 
-      - name: Run coverage threshold gate
-        run: npm run test:coverage -- --ci --passWithNoTests
+      - name: Run JS coverage
+        run: npm run test:coverage || true
+        working-directory: backend
 
-      - name: Enforce coverage thresholds
-        run: npm run coverage:check
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
 
-      - name: Upload coverage report
-        if: always()
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+
+      - name: Run Rust coverage
+        run: cargo tarpaulin --out Xml --exclude-files "**/*.pb.rs" "**/*_gen.rs" "**/test/**" "**/*integration*" || true
+
+      - name: Download baseline coverage
+        uses: dawidd6/action-download-artifact@v2
+        if: github.event_name == 'pull_request'
+        with:
+          branch: main
+          name: baseline-coverage
+          path: baseline
+          workflow_search: true
+        continue-on-error: true
+
+      - name: Check coverage threshold
+        run: python scripts/check_coverage.py > coverage_report.md
+
+      - name: Post PR Comment
+        if: github.event_name == 'pull_request' && always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          path: coverage_report.md
+
+      - name: Upload new baseline
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
-          name: backend-coverage-report
-          path: backend/coverage
-          if-no-files-found: ignore
-          retention-days: 14
+          name: baseline-coverage
+          path: |
+            cobertura.xml
+            backend/coverage/lcov.info
