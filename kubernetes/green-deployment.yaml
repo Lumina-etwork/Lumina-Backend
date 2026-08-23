@@ -16,6 +16,7 @@ spec:
   template:
     metadata:
       labels:
+        sidecar.istio.io/inject: "true"
         app: vesting-vault
         version: green
         track: canary
