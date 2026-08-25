@@ -51,6 +51,7 @@ pub struct FlowTableMetrics {
     pub close_evictions: u64,
     /// Entries evicted during force-close sweep.
     pub force_evictions: u64,
+    pub last_gc_scan_duration_ms: u64,
 }
 
 pub struct FlowTable {
@@ -61,6 +62,7 @@ pub struct FlowTable {
     pub initialized: AtomicBool,
     /// Total flow count for quick reads without locking.
     pub flow_count: AtomicU64,
+    pub last_scan_duration: AtomicU64,
 }
 
 impl FlowTable {
@@ -70,6 +72,7 @@ impl FlowTable {
             stale_ttl: Duration::from_secs(STALE_TTL_SECS),
             initialized: AtomicBool::new(false),
             flow_count: AtomicU64::new(0),
+            last_scan_duration: AtomicU64::new(0),
         }
     }
 
@@ -80,6 +83,7 @@ impl FlowTable {
             stale_ttl: ttl,
             initialized: AtomicBool::new(false),
             flow_count: AtomicU64::new(0),
+            last_scan_duration: AtomicU64::new(0),
         }
     }
 
@@ -115,6 +119,7 @@ impl FlowTable {
     /// Scan for stale entries (no traffic for > stale_ttl) and evict them.
     /// Returns the list of evicted flow IDs for logging / metrics.
     pub fn evict_stale(&mut self) -> Vec<String> {
+        let scan_start = Instant::now();
         let now = Instant::now();
         let stale_ids: Vec<String> = self
             .flows
@@ -131,6 +136,8 @@ impl FlowTable {
             self.flow_count.store(self.flows.len() as u64, Ordering::SeqCst);
         }
 
+        let duration = scan_start.elapsed().as_millis() as u64;
+        self.last_scan_duration.store(duration, Ordering::SeqCst);
         stale_ids
     }
 
@@ -173,6 +180,7 @@ impl FlowTable {
             stale_evictions: 0,   // tracked externally via evict_stale() return
             close_evictions: 0,   // tracked externally via on_socket_close() return
             force_evictions: 0,   // tracked externally via evict_orphans() return
+            last_gc_scan_duration_ms: self.last_scan_duration.load(Ordering::SeqCst),
         }
     }
 
@@ -265,3 +273,5 @@ mod tests {
         assert!(ft.is_empty());
     }
 }
+
+
