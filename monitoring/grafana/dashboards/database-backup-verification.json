@@ -1,0 +1,59 @@
+{
+  "title": "Database Backup Verification",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Backup Status",
+      "targets": [{ "expr": "backup_verification_status{operation=\"backup\"}" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "text": "FAILED", "color": "red" }, "1": { "text": "OK", "color": "green" } }, "type": "value" }
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Restore Test Status",
+      "targets": [{ "expr": "backup_verification_status{operation=\"restore_test\"}" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "text": "FAILED", "color": "red" }, "1": { "text": "OK", "color": "green" } }, "type": "value" }
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Hours Since Last Backup",
+      "targets": [{ "expr": "(time() - backup_last_success_timestamp{operation=\"backup\"}) / 3600" }],
+      "unit": "h"
+    },
+    {
+      "type": "stat",
+      "title": "Latest Backup Size",
+      "targets": [{ "expr": "backup_size_bytes" }],
+      "unit": "decbytes"
+    },
+    {
+      "type": "timeseries",
+      "title": "Backup Duration P95",
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(backup_duration_seconds_bucket[5m])) by (le, operation))" }],
+      "unit": "s"
+    },
+    {
+      "type": "timeseries",
+      "title": "Failures",
+      "targets": [{ "expr": "increase(backup_failures_total[1h])" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Restore Test Row Deltas",
+      "targets": [{ "expr": "backup_restore_test_row_delta" }]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

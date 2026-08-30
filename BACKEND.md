@@ -95,6 +95,254 @@ latency and config reload failures, then shift 100% if healthy.
 
 
 
+# Scheduled Database Backup Verification Architecture
+
+## Overview
+
+The Lumina backend depends on PostgreSQL for all persistent state. A backup is
+only useful if it can actually be restored. This subsystem guarantees that by
+running a three-stage pipeline on a schedule:
+
+1. **Backup** — a consistent `pg_dump` snapshot is compressed, encrypted at
+   rest with AES-256, and optionally copied off-site to S3.
+2. **Verification** — the artifact is decrypted, decompressed, checksum-verified
+   against its manifest, and checked for a valid PostgreSQL dump header and
+   `CREATE TABLE` statements.
+3. **Restore testing** — the verified backup is restored into an isolated
+   scratch database, and table/row counts are compared against the live
+   database. The scratch database is dropped afterwards.
+
+Every run emits Prometheus metrics, appends to a local JSONL history file, and
+exposes status through an admin API so a "backup succeeded" claim is backed by
+evidence that the data is actually restorable.
+
+## Pipeline
+
+`BackupVerificationJob` (node-cron, process-local schedules) drives two
+schedules against `BackupVerificationService`:
+
+```
+   takeBackup:  pg_dump ──▶ gzip (zlib) ──▶ AES-256 (openssl) ──▶ [S3] ──▶ manifest
+   verifyBackup: openssl -d ──▶ gunzip ──▶ sha256 vs manifest ──▶ header/tables check
+   restoreTest:  CREATE scratch DB ──▶ psql restore ──▶ compare counts ──▶ DROP scratch DB
+```
+
+### Artifacts and manifests
+
+Artifacts are stored in `BACKUP_DIR` (default `./backups`) as
+`backup_YYYY-MM-DD_HH-MM-SS_SSS.sql.gz[.enc]`. A sibling manifest records the
+SHA-256 digest of the plain SQL dump and the encrypted artifact, size, source
+database, and creation time. The manifest is the source of truth for the
+checksum comparison performed during verification.
+
+### Restore testing
+
+The restore test creates a scratch database
+(`<BACKUP_SCRATCH_DB_PREFIX><epoch-ms>`) via `psql`, restores the plain SQL
+dump with `ON_ERROR_STOP=1`, compares the number of `public` schema tables and
+the row count of each table in `BACKUP_VERIFY_TABLES` (default `vaults,
+sub_schedules, beneficiaries`) against the live database, then drops the
+scratch database in a `finally` block (terminating lingering connections
+first). Any row delta (source − restored) other than 0 marks the run failed.
+
+## Scheduling
+
+| Schedule | Default | Action |
+|----------|---------|--------|
+| `BACKUP_CRON` | `0 2 * * *` (daily 02:00) | Backup + integrity verification |
+| `BACKUP_RESTORE_TEST_CRON` | `0 4 * * 0` (Sunday 04:00) | Restore test of the latest verified artifact |
+
+Both can be disabled with `BACKUP_ENABLED=false` and
+`BACKUP_RESTORE_TEST_ENABLED=false`. Schedules are process-local, so exactly
+one backend instance should start the job, matching the other scheduled jobs.
+
+## Configuration
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `BACKUP_ENABLED` | `true` | Master switch for the scheduled job |
+| `BACKUP_DIR` | `./backups` | Local artifact + history directory |
+| `BACKUP_CRON` | `0 2 * * *` | Daily backup + verify schedule |
+| `BACKUP_RESTORE_TEST_CRON` | `0 4 * * 0` | Weekly restore-test schedule |
+| `BACKUP_RESTORE_TEST_ENABLED` | `true` | Enable/disable restore testing |
+| `BACKUP_RETENTION_DAYS` | `30` | Local artifact retention window |
+| `BACKUP_ENCRYPTION_KEY` | unset | AES-256 key (>= 16 chars; required in production) |
+| `BACKUP_S3_BUCKET` | unset | Off-site copy target, e.g. `s3://lumina-backups/prod` |
+| `BACKUP_S3_UPLOAD` | `false` | Enable the `aws s3 cp` off-site copy |
+| `BACKUP_VERIFY_TABLES` | `vaults,sub_schedules,beneficiaries` | Tables compared in the restore test |
+| `BACKUP_SCRATCH_DB_PREFIX` | `lumina_restore_test_` | Scratch database name prefix |
+| `BACKUP_MAINTENANCE_DB` | `postgres` | Maintenance database for CREATE/DROP |
+| `BACKUP_HISTORY_LIMIT` | `500` | JSONL history entries kept |
+| `PG_*` / `DB_*` | — | PostgreSQL connection |
+
+Configuration is validated at startup (`BackupConfigError` on invalid cron
+expressions, retention windows, bucket URIs, or key lengths), so a typo fails
+fast instead of silently mis-behaving.
+
+## Security
+
+- **Encryption at rest:** AES-256-CBC (OpenSSL, PBKDF2, 100k iterations); the
+  key comes from `BACKUP_ENCRYPTION_KEY` / the secrets service and is never
+  logged.
+- **Integrity:** SHA-256 digests recorded in the manifest are re-computed on
+  verification, catching both corruption and tampering.
+- **Scratch database isolation:** restore tests never touch the live database;
+  they run against a dedicated database created and dropped per run.
+- **No secrets in code:** credentials come from the environment/secrets
+  service, matching the rest of the backend.
+
+## Monitoring and alerting
+
+Metrics are registered on the shared Prometheus registry (exposed at
+`/metrics`) and documented in
+`monitoring/prometheus/database-backup-verification-rules.yaml`:
+
+- `backup_attempts_total{operation}` / `backup_failures_total{operation,reason}`
+- `backup_duration_seconds{operation}` (histogram)
+- `backup_size_bytes`
+- `backup_verification_status{operation}` (1 = ok, 0 = failed)
+- `backup_last_success_timestamp{operation}`
+- `backup_restore_test_row_delta{table}` (source − restored)
+
+Alerts: `DatabaseBackupFailed`, `DatabaseBackupStale` (>36h),
+`DatabaseBackupVerificationFailed`, `DatabaseBackupRestoreTestFailed`,
+`DatabaseBackupRestoreTestStale` (>8d), `DatabaseBackupRestoreRowDeltaMismatch`.
+A Grafana dashboard is provided at
+`monitoring/grafana/dashboards/database-backup-verification.json`.
+
+## Performance and availability
+
+The pipeline runs entirely off the request critical path; the <100 ms P99 API
+target is unaffected. The job never blocks startup and a failure only surfaces
+through metrics, history, and alerts.
+
+## Deployment (blue-green / canary)
+
+1. Deploy the new image to the green pool with `BACKUP_ENABLED=false` and
+   `BACKUP_RESTORE_TEST_ENABLED=false`.
+2. Send 5% canary traffic to green; verify `backup_verification_status` gauges
+   appear and no configuration errors are logged.
+3. Enable restore testing on green first (`BACKUP_RESTORE_TEST_ENABLED=true`)
+   and confirm a complete cycle passes.
+4. Enable the full schedule (`BACKUP_ENABLED=true`) and promote green once a
+   daily + weekly cycle passes.
+
+
+
+# Scheduled Database Backup Verification Runbook
+
+## Enablement
+
+1. Set `BACKUP_ENCRYPTION_KEY` (>= 16 chars) via the secrets service or
+   environment. Without it, artifacts are stored gzip-only and production
+   should not proceed.
+2. Set `PG_DB`/`PG_USER`/`PG_HOST`/`PG_PORT`/`PG_PASSWORD` (or the `DB_*`
+   equivalents). The user needs `CREATEDB` privileges for restore testing.
+3. (Optional) Set `BACKUP_S3_BUCKET` and `BACKUP_S3_UPLOAD=true` for an
+   off-site copy.
+4. Deploy with `BACKUP_ENABLED=true` and `BACKUP_RESTORE_TEST_ENABLED=true`.
+5. Confirm the schedules are active in the logs
+   (`[BackupVerification] Scheduling daily backup+verify at "0 2 * * *"`).
+6. Confirm `backup_verification_status{operation="backup"}` becomes 1 after
+   the first run.
+
+## Manual runs
+
+Full cycle (backup + verify + restore test):
+
+```bash
+cd backend
+node scripts/run-backup-verification.js
+```
+
+Restore test of the latest artifact only:
+
+```bash
+node scripts/run-backup-verification.js --restore-test
+```
+
+Backup + integrity verification only (no restore test):
+
+```bash
+node scripts/run-backup-verification.js --backup-only
+```
+
+Via the API:
+
+```bash
+curl -X POST http://localhost:4000/api/admin/backups/run
+curl -X POST http://localhost:4000/api/admin/backups/restore-test
+curl http://localhost:4000/api/admin/backups/status
+curl http://localhost:4000/api/admin/backups/history?limit=20
+```
+
+## Alert responses
+
+### DatabaseBackupFailed
+
+Query: `increase(backup_failures_total{operation="backup"}[5m]) > 0`
+
+Action: check the backup history (`/api/admin/backups/history`), verify the
+database is reachable, then trigger a manual run.
+
+### DatabaseBackupStale
+
+Query: `time() - backup_last_success_timestamp{operation="backup"} > 36 * 3600`
+
+Action: confirm the job is running and no alerts are suppressed; trigger a
+manual backup and confirm the metric updates.
+
+### DatabaseBackupVerificationFailed
+
+Action: the artifact failed checksum or dump-content checks. Treat the latest
+artifact as unverified until a manual `--restore-test` passes; investigate
+corruption at rest (disk, S3).
+
+### DatabaseBackupRestoreTestFailed
+
+Action: the backup restored but the scratch database did not reproduce the
+source schema/row counts. Inspect `backup_restore_test_row_delta`, re-run
+manually, and treat the backup as not restorable if it persists.
+
+### DatabaseBackupRestoreTestStale
+
+Action: no successful restore test in 8 days. Confirm the weekly cron fired;
+run `node scripts/run-backup-verification.js --restore-test` to re-establish
+the last-success timestamp.
+
+### DatabaseBackupRestoreRowDeltaMismatch
+
+Action: compare the live database to the restored copy for the flagged table.
+A non-zero delta usually indicates a backup taken mid-write or a schema
+change; verify the source and re-run the restore test.
+
+## Disaster recovery (manual restore)
+
+1. Select an artifact (prefer the newest one whose manifest checksum verifies).
+2. Decrypt and decompress to a plain SQL file:
+   ```bash
+   openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
+     -pass env:BACKUP_ENCRYPTION_KEY \
+     -in  $BACKUP_DIR/backup_<ts>.sql.gz.enc -out /tmp/backup.sql.gz
+   gunzip -c /tmp/backup.sql.gz > /tmp/backup.sql
+   ```
+3. Verify the dump before touching the live database (`head -c 512 /tmp/backup.sql`
+   should show the PostgreSQL dump header; check `CREATE TABLE` count).
+4. Restore: `psql -h $PG_HOST -p $PG_PORT -U $PG_USER -d $PG_DB -v ON_ERROR_STOP=1 -f /tmp/backup.sql`.
+5. Smoke-check the restored database (table count, key row counts, and a
+   representative query).
+
+## Disabling / rollback
+
+- Stop new runs: set `BACKUP_ENABLED=false` (and
+  `BACKUP_RESTORE_TEST_ENABLED=false`) and redeploy — manual/API triggers
+  still work for emergencies.
+- Roll back the feature: revert the deployment; no schema migrations are
+  involved, so rollback is a plain image revert.
+
+
+
+
 ## API Documentation
 
 

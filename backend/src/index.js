@@ -145,6 +145,16 @@ const startServer = async () => {
       console.error("Failed to initialize Vault Registry Indexing Job:", jobError);
     }
 
+    let backupVerificationJob = null;
+    try {
+      const { BackupVerificationJob } = require('./jobs/backupVerificationJob');
+      backupVerificationJob = new BackupVerificationJob();
+      backupVerificationJob.start();
+      console.log("Backup Verification Job started successfully.");
+    } catch (jobError) {
+      console.error("Failed to initialize Backup Verification Job:", jobError);
+    }
+
     httpServer.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
       console.log(`REST API available at: http://localhost:${PORT}`);
@@ -158,6 +168,7 @@ const startServer = async () => {
           vaultReconciliationJob,
           notificationService,
           vaultRegistryIndexingJob,
+          backupVerificationJob,
         ].filter(Boolean),
         onPhase: (phase) => {
           try {

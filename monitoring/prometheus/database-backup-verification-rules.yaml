@@ -1,0 +1,56 @@
+groups:
+  - name: database-backup-verification
+    rules:
+      - alert: DatabaseBackupFailed
+        expr: increase(backup_failures_total{operation="backup"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Scheduled database backup failed
+          description: The nightly pg_dump backup pipeline reported a failure. No new restorable artifact exists for the latest cycle.
+
+      - alert: DatabaseBackupStale
+        expr: time() - backup_last_success_timestamp{operation="backup"} > 36 * 3600
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: No successful database backup in the last 36 hours
+          description: The last successful backup was more than 36 hours ago. Verify the backup cron is running and the database is reachable.
+
+      - alert: DatabaseBackupVerificationFailed
+        expr: increase(backup_failures_total{operation="verify"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Backup integrity verification failed
+          description: A backup artifact failed decrypt/decompress, checksum, or dump-content verification. The artifact should be treated as unverified.
+
+      - alert: DatabaseBackupRestoreTestFailed
+        expr: increase(backup_failures_total{operation="restore_test"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Database restore test failed
+          description: Restoring the latest backup into the scratch database did not reproduce the source schema or row counts. The backup may not be restorable.
+
+      - alert: DatabaseBackupRestoreTestStale
+        expr: time() - backup_last_success_timestamp{operation="restore_test"} > 8 * 86400
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: No successful restore test in the last 8 days
+          description: The weekly restore test has not completed successfully recently. Backups are being taken but their restorability is unproven.
+
+      - alert: DatabaseBackupRestoreRowDeltaMismatch
+        expr: abs(backup_restore_test_row_delta) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Restored table row count differs from the source
+          description: A table restored from backup has a different row count than the live database (delta = source - restored). Investigate the restore test report.
