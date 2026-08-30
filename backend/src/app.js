@@ -622,6 +622,9 @@ app.use("/api/slow-queries", require('./routes/slowQueryRoutes'));
 // Mount dead letter queue management routes (Issue #104)
 app.use("/api/dlq", require('./routes/deadLetterQueue'));
 
+// Mount scheduled database backup verification routes (Issue #101)
+app.use("/api/admin/backups", require('./routes/backupVerificationRoutes'));
+
 // Historical price tracking job management endpoints
 app.post("/api/admin/jobs/historical-prices/start", async (req, res) => {
   try {

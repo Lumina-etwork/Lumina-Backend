@@ -14,7 +14,9 @@
     "test:e2e:headed": "playwright test --headed",
     "test:parity": "cross-env NODE_ENV=test jest --testPathPattern='sorobanVestingParity.test' --forceExit --verbose",
     "test:all": "npm run test:integration && npm run test:e2e",
-    "coverage:check": "node scripts/enforce-coverage-thresholds.js"
+    "coverage:check": "node scripts/enforce-coverage-thresholds.js",
+    "backup:verify": "node scripts/run-backup-verification.js",
+    "backup:restore-test": "node scripts/run-backup-verification.js --restore-test"
   },
   "dependencies": {
     "@apollo/server": "^4.9.5",
