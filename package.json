@@ -1,0 +1,26 @@
+{
+  "name": "lumina-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Soroban event indexer and demographic-blind matching engine for Lumina Network",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "mock-rpc": "node scripts/mock-soroban-rpc.mjs",
+    "test": "node --test test/*.test.js",
+    "test:integration": "node --test test/indexer.integration.test.js test/websocket.integration.test.js test/websocket-resilience.integration.test.js",
+    "test:ws": "node --test test/websocket-backoff.test.js test/websocket-jitter.test.js test/websocket-offline-buffer.test.js test/websocket-sqlite-persistence.test.js test/websocket-idempotency.test.js"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^17.2.1",
+    "better-sqlite3": "^11.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
