@@ -55,11 +55,11 @@ function seedInitialEvents() {
     value: encodeVec([1n, SAMPLE_HASH, now], ['u64', undefined, 'u64']),
   });
 
-  // 2. Escrow opened: topics (symbol, client) | value (escrow_id, creator, i128)
+  // 2. Escrow opened: topics (symbol, client) | value (escrow_id, creator, i128, u32)
   pushEvent({
     contractId: CONTRACT_ID,
     topics: [encodeSymbol('escrow_new'), encodeAddress(CLIENT)],
-    value: encodeVec([1n, CREATOR, 1500000000n], ['u64', 'address', 'i128']),
+    value: encodeVec([1n, CREATOR, 1500000000n, 2n], ['u64', 'address', 'i128', 'u32']),
   });
 
   // 3. Milestone released: topics (symbol, escrow_id) | value (i128 payout, u32 completed)

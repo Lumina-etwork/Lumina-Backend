@@ -49,7 +49,7 @@ export class IndexerPoller {
 
     const start = this.stmt.getCursor.get(START_LEDGER_KEY);
     const parsed = Number(start?.value);
-    return Number.isFinite(parsed) && parsed > 0 ? String(parsed) : String(this.startLedger);
+    return Number.isFinite(parsed) && parsed > 0 ? String(parsed) : String(this.startLedger ?? 0);
   }
 
   writeCursor(value) {
@@ -213,10 +213,15 @@ export class IndexerPoller {
 
   async pollOnce() {
     const cursor = this.readCursor();
+    // A persisted cursor is a `<ledger>-<sequence>` paging token, which the RPC
+    // only accepts via `pagination.cursor`. Passing it as `startLedger` yields a
+    // NaN ledger and silently stops ingesting, so keep the two paths distinct.
+    const usingToken = /^\d+-\d+$/.test(cursor);
+
     const { events = [] } = await this.server.getEvents({
-      startLedger: cursor,
+      ...(usingToken ? {} : { startLedger: Number(cursor) || 0 }),
       filters: [{ type: 'contract', contractIds: [this.contractId] }],
-      pagination: { limit: 100 },
+      pagination: { limit: 100, ...(usingToken ? { cursor } : {}) },
     });
 
     return events.length === 0 ? [] : this.ingestBatch(events);

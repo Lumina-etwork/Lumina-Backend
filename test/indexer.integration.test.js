@@ -129,6 +129,65 @@ describe('Lumina Event Indexer: decoding + SQLite ingestion', () => {
     assert.match(cursor.value, /^\d+-\d+$/);
   });
 
+  it('resumes via pagination.cursor (not startLedger) once a token is stored', async () => {
+    const cursorDb = initDatabase(':memory:');
+    try {
+      cursorDb
+        .prepare('INSERT OR REPLACE INTO sync_cursor (key, value) VALUES (?, ?)')
+        .run('latest_paging_token', '000000001003-0000000003');
+
+      let captured;
+      const fakeServer = {
+        getEvents: async (request) => {
+          captured = request;
+          return { events: [] };
+        },
+      };
+
+      const p = new IndexerPoller({
+        db: cursorDb,
+        server: fakeServer,
+        contractId: MOCK_CONTRACT_ID,
+        pollIntervalMs: 1000,
+        logger: silent,
+      });
+      await p.pollOnce();
+
+      assert.equal(captured.pagination.cursor, '000000001003-0000000003');
+      assert.equal(captured.startLedger, undefined, 'a token must not be sent as startLedger');
+    } finally {
+      cursorDb.close();
+    }
+  });
+
+  it('uses a numeric startLedger before any token has been persisted', async () => {
+    const freshDb = initDatabase(':memory:');
+    try {
+      let captured;
+      const fakeServer = {
+        getEvents: async (request) => {
+          captured = request;
+          return { events: [] };
+        },
+      };
+
+      const p = new IndexerPoller({
+        db: freshDb,
+        server: fakeServer,
+        contractId: MOCK_CONTRACT_ID,
+        pollIntervalMs: 1000,
+        startLedger: 7,
+        logger: silent,
+      });
+      await p.pollOnce();
+
+      assert.equal(captured.startLedger, 7);
+      assert.equal(captured.pagination.cursor, undefined);
+    } finally {
+      freshDb.close();
+    }
+  });
+
   it('ignores pay_rel for an escrow it has never seen', () => {
     const orphan = payRelEvent({ escrowId: 999, completedMilestones: 1, ledger: 1010 });
     const applied = poller.ingestBatch([orphan]);
